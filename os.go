@@ -42,7 +42,7 @@ type OsStores struct {
 }
 
 func NewOsStores(root string) OsStores {
-	return OsStores{root, OsFileLocker{filepath.Join(root, "locks")}}
+	return OsStores{root, NewOsFileLocker(filepath.Join(root, "locks"))}
 }
 
 func (i OsStores) Root() string {
@@ -415,6 +415,10 @@ var _ NamedLock = OsFileLocker{}
 
 type OsFileLocker struct {
 	root string // "/locks"
+}
+
+func NewOsFileLocker(root string) OsFileLocker {
+	return OsFileLocker{root: root}
 }
 
 func (l OsFileLocker) New(name string) (Locker, error) {

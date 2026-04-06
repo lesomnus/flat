@@ -8,11 +8,14 @@ import (
 )
 
 func TestOsStore(t *testing.T) {
+	new_stores := func(t *testing.T) Stores {
+		t.Helper()
+		root := t.TempDir()
+		return NewOsStores(root)
+	}
 	new_store := func(t *testing.T) Store {
 		t.Helper()
-
-		root := t.TempDir()
-		stores := NewOsStores(root)
+		stores := new_stores(t)
 		return stores.Use("test")
 	}
 
@@ -21,7 +24,7 @@ func TestOsStore(t *testing.T) {
 	}
 
 	t.Run("contract", func(t *testing.T) {
-		testStore(t, new_store)
+		testStore(t, new_stores)
 	})
 
 	t.Run("single-ref erase removes global blob", func(t *testing.T) {

@@ -9,10 +9,16 @@ import (
 
 var digest_nil = Digest("0000000000000000000000000000000000000000000000000000000000000000")
 
-type newStoreFn func(t *testing.T) Store
+type newStoresFn func(t *testing.T) Stores
 
-func testStore(t *testing.T, new_store newStoreFn) {
+func testStore(t *testing.T, new_stores newStoresFn) {
 	t.Helper()
+
+	new_store := func(t *testing.T) Store {
+		t.Helper()
+		stores := new_stores(t)
+		return stores.Use("test")
+	}
 
 	t.Run("add then get", func(t *testing.T) {
 		ctx, x := x.New(t)
@@ -89,5 +95,115 @@ func testStore(t *testing.T, new_store newStoreFn) {
 		labels := Labels{"foo": {"bar"}}
 		err := s.Label(ctx, digest_nil, labels)
 		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("erase on missing blob does not return error", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		err := s.Erase(ctx, digest_nil)
+		x.NoError(err)
+	})
+	t.Run("get across stores returns ErrNotExist", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		added, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		_, err = s2.Get(ctx, added.Digest)
+		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("open across stores returns ErrNotExist", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		added, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		_, _, err = s2.Open(ctx, added.Digest)
+		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("label across stores returns ErrNotExist", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		added, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		err = s2.Label(ctx, added.Digest, Labels{"foo": {"bar"}})
+		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("erase does not remove blob from other store", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		added, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		err = s2.Erase(ctx, added.Digest)
+		x.NoError(err)
+
+		_, err = s1.Get(ctx, added.Digest)
+		x.NoError(err)
+	})
+	t.Run("duplicate check is scoped to each store", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		_, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+		_, err = s2.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		_, err = s1.Add(ctx, Meta{}, x.Reader())
+		x.ErrorIs(err, ErrAlreadyExists)
+		_, err = s2.Add(ctx, Meta{}, x.Reader())
+		x.ErrorIs(err, ErrAlreadyExists)
+	})
+	t.Run("same digest labels are isolated by store", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		stores := new_stores(t)
+		s1 := stores.Use("a")
+		s2 := stores.Use("b")
+
+		m1, err := s1.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+		m2, err := s2.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+		x.Eq(m1.Digest, m2.Digest)
+
+		labels_a := Labels{"Content-Type": {"text/plain"}, "Repo": {"a"}}
+		labels_b := Labels{"Content-Type": {"application/json"}, "Repo": {"b"}}
+
+		err = s1.Label(ctx, m1.Digest, labels_a)
+		x.NoError(err)
+		err = s2.Label(ctx, m2.Digest, labels_b)
+		x.NoError(err)
+
+		got_a, err := s1.Get(ctx, m1.Digest)
+		x.NoError(err)
+		got_b, err := s2.Get(ctx, m2.Digest)
+		x.NoError(err)
+
+		x.Eq(labels_a.Get("Content-Type"), got_a.Labels.Get("Content-Type"))
+		x.Eq(labels_a.Get("Repo"), got_a.Labels.Get("Repo"))
+		x.Eq(labels_b.Get("Content-Type"), got_b.Labels.Get("Content-Type"))
+		x.Eq(labels_b.Get("Repo"), got_b.Labels.Get("Repo"))
 	})
 }
