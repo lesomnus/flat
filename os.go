@@ -187,7 +187,7 @@ func (s OsStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 
 	// Now the blob is staged, so move it to the destination path atomically.
 	pr := filepath.Dir(pb)
-	if err := os.MkdirAll(pr, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(pr), 0o755); err != nil {
 		return m, fmt.Errorf("mkdir repo: %w", err)
 	}
 	if err := os.Rename(ps, pr); err != nil {
