@@ -1,9 +1,17 @@
 package x
 
-import "bytes"
+import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+)
 
 func (X) Data() []byte {
 	return []byte("Royale with Cheese")
+}
+
+func (x X) Digest() string {
+	return fmt.Sprintf("%x", sha256.Sum256(x.Data()))
 }
 
 func (x X) Reader() *bytes.Reader {

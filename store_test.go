@@ -27,6 +27,7 @@ func testStore(t *testing.T, new_stores newStoresFn) {
 		labels := Labels{"Content-Type": {"text/plain"}}
 		added, err := s.Add(ctx, Meta{Labels: labels}, x.Reader())
 		x.NoError(err)
+		x.Eq(x.Digest(), string(added.Digest))
 
 		got, err := s.Get(ctx, added.Digest)
 		x.NoError(err)

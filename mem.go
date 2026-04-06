@@ -58,7 +58,9 @@ func (s *MemStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 		return m, fmt.Errorf("read: %w", err)
 	}
 
-	d := Digest(fmt.Sprintf("%x", Hash().Sum(data)))
+	h := Hash()
+	h.Write(data)
+	d := Digest(fmt.Sprintf("%x", h.Sum(nil)))
 	m.Size = int64(len(data))
 
 	if m.Digest == "" {
@@ -67,7 +69,7 @@ func (s *MemStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 		return m, ErrDigestMismatch
 	}
 
-	b_new := &memBlob{data: data, refs: 1}
+	b_new := &memBlob{data: data, refs: 0}
 	b := b_new
 	for {
 		b = b_new
@@ -152,6 +154,12 @@ func (s *MemStore) Label(ctx context.Context, d Digest, labels Labels) error {
 		return ErrNotExist
 	}
 
+	// If Label and Erase race, two orderings are possible:
+	// (a) Label writes then Erase removes the entry, so the written labels are lost with the entry
+	// (b) Erase removes the entry first, causing Label's Load to miss and return [ErrNotExist].
+	// In neither case can a label survive, so the observable invariant is preserved.
+	// Serialising Label and Erase is intentionally not implemented.
+
 	entry := v.(*memEntry)
 	ls := maps.Clone(labels)
 	entry.labels.Store(&ls)
@@ -170,7 +178,7 @@ func (s *MemStore) Erase(ctx context.Context, d Digest) error {
 	defer entry.blob.mu.Unlock()
 
 	entry.blob.refs--
-	if entry.blob.refs > 1 {
+	if entry.blob.refs > 0 {
 		// There is another reference to this blob.
 		return nil
 	}
@@ -180,7 +188,6 @@ func (s *MemStore) Erase(ctx context.Context, d Digest) error {
 	return nil
 }
 
-// memBlob holds the raw content shared across all stores in the global namespace.
 type memBlob struct {
 	mu   sync.Mutex
 	data []byte

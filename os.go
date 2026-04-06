@@ -280,6 +280,21 @@ func (s OsStore) Label(ctx context.Context, d Digest, labels Labels) error {
 	return nil
 }
 
+// Erase removes the blob entry for this store and best-effort cleans up the
+// global blob.
+//
+// Consistency with concurrent [OsStore.Add] - Erase does not hold the blob lock
+// during RemoveAll, so an Add that is simultaneously moving its staged directory
+// into the repo may race. Two orderings are possible:
+//
+//	(a) Rename happens before RemoveAll: the entry is immediately erased, which is
+//	    equivalent to the user deleting the blob right after uploading it
+//	(b) RemoveAll happens before Rename: the entry is created after Erase returns,
+//	    giving the appearance the blob was added after the deletion.
+//
+// In case (b) the global blob (pd) may also have been removed by [tryCleanup]
+// before Rename completes, leaving the repo entry's hard link as the sole surviving
+// inode — an orphan.
 func (s OsStore) Erase(ctx context.Context, d Digest) error {
 	pr := s.pathToRepo(d)
 	if err := os.RemoveAll(pr); err != nil && !os.IsNotExist(err) {
