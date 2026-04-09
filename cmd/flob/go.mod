@@ -3,12 +3,16 @@ module github.com/lesomnus/flob/cmd/flob
 go 1.26.1
 
 require (
+	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/lesomnus/flob v0.0.0-20260408210104-38f265a258b8
 	github.com/lesomnus/mkot v0.0.0-20260222083905-204343130f4e
 	github.com/lesomnus/mkot/otlp v0.0.0-20260222083905-204343130f4e
 	github.com/lesomnus/mkot/otlphttp v0.0.0-20260222083905-204343130f4e
 	github.com/lesomnus/mkot/pretty v0.0.0-20260222083905-204343130f4e
 	github.com/lesomnus/otx v0.0.0-20260119182817-de8acf8eaa8d
+	github.com/lesomnus/otx/otxhttp v0.0.0-20260119182817-de8acf8eaa8d
+	github.com/lesomnus/xddr v0.0.0-20260208135413-ea486b6aa52b
 	github.com/lesomnus/xli v0.0.0-20251129214310-274b1fcfb863
 	github.com/lesomnus/z v0.0.0-20260310180618-50a9518cc8a9
 	go.opentelemetry.io/otel v1.39.0
@@ -20,15 +24,17 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
+	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.4 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelslog v0.14.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.15.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.15.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.39.0 // indirect

@@ -1,9 +1,16 @@
 stores:
-  use: mem/test
-  mem/test:
-  os/cwd:
-    path: .flob
-  http/local:
+  # # There is no default store but any ".use" for "mem/*" will be treated as "mem" store
+  # # and the stores are created on demand when used.
+
+  # # Example:
+  # os/cwd:
+  #   path: .flob
+  # http/local:
+  #   target: http://localhost:8080
+
+server:
+  # use: mem
+  # addr: 0.0.0.0:8080
 
 client:
-  use: http/local
+  # use: mem

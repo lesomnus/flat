@@ -20,7 +20,7 @@ func NewCmdAdd() *xli.Command {
 			&arg.String{Name: "FILE"},
 		},
 
-		Handler: WithStores(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
+		Handler: useClientStore(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
 			id := arg.MustGet[string](cmd, "STORE_ID")
 			p := arg.MustGet[string](cmd, "FILE")
 
@@ -50,7 +50,7 @@ func NewCmdGet() *xli.Command {
 			&arg.String{Name: "DIGEST"},
 		},
 
-		Handler: WithStores(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
+		Handler: useClientStore(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
 			id := arg.MustGet[string](cmd, "STORE_ID")
 			d_ := arg.MustGet[string](cmd, "DIGEST")
 
@@ -86,7 +86,7 @@ func NewCmdRead() *xli.Command {
 			&arg.String{Name: "DIGEST"},
 		},
 
-		Handler: WithStores(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
+		Handler: useClientStore(func(ctx context.Context, cmd *xli.Command, s flob.Stores) error {
 			id := arg.MustGet[string](cmd, "STORE_ID")
 			d_ := arg.MustGet[string](cmd, "DIGEST")
 

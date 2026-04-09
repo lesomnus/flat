@@ -20,11 +20,23 @@ type Config struct {
 	path string
 
 	Stores configs.StoresConfig
-	Otel   configs.OtelConfig `yaml:",omitempty"`
+	Server configs.ServerConfig
+	Client configs.ClientConfig
+
+	Otel configs.OtelConfig `yaml:",omitempty"`
 }
 
-func (c *Config) Sanitize() error {
-	return errors.Join()
+func NewConfig() *Config {
+	return &Config{
+		Stores: configs.StoresConfig{},
+	}
+}
+
+func (c *Config) Evaluate() error {
+	return errors.Join(
+		c.Server.Evaluate(),
+		c.Client.Evaluate(),
+	)
 }
 
 func configHandler() xli.Handler {
@@ -46,11 +58,15 @@ func configHandler() xli.Handler {
 			}
 		}
 
-		c := &Config{}
+		c := NewConfig()
 		if conf_path == "" {
 			c.path = "/dev/null"
 		} else if err := readConfigFile(ctx, c, conf_path); err != nil {
 			return z.Err(err, "read config")
+		}
+
+		if err := c.Evaluate(); err != nil {
+			return z.Err(err, "evaluate config")
 		}
 
 		ctx, otx, err := c.Otel.Build(ctx)

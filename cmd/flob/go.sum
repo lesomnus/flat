@@ -6,6 +6,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=
 github.com/fatih/color v1.18.0/go.mod h1:4FelSpRwEGDpQ12mAdzqdOukCy4u8WUtOY6lkT/6HfU=
+github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
+github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -15,6 +17,8 @@ github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPE
 github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
 github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
+github.com/gofrs/flock v0.13.0 h1:95JolYOvGMqeH31+FC7D2+uULf6mG61mEZ/A8dRYMzw=
+github.com/gofrs/flock v0.13.0/go.mod h1:jxeyy9R1auM5S6JYDBhDt+E2TCo7DkratH4Pgi8P+Z0=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
@@ -27,6 +31,8 @@ github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
+github.com/lesomnus/flob v0.0.0-20260408210104-38f265a258b8 h1:+DGDgpIdM8ChDSV+fG74tWyRjW7FRueZ4EUI8stVR7g=
+github.com/lesomnus/flob v0.0.0-20260408210104-38f265a258b8/go.mod h1:MT4dXcP4FMjF0orL4ofOk3bGYiPCqMjkDPjG101mYwY=
 github.com/lesomnus/mkot v0.0.0-20260222083905-204343130f4e h1:h0HFSZkoH/8Dhww270CSG6dLN7uweeARYUvN1Y9GUSM=
 github.com/lesomnus/mkot v0.0.0-20260222083905-204343130f4e/go.mod h1:1yIKRMfTzOsfla2jMMrMN53nByLHNn1rGEiYDtE/uaM=
 github.com/lesomnus/mkot/otlp v0.0.0-20260222083905-204343130f4e h1:8wU+E4Ce2IG9UslnRMevVaTeUnDsDZIbzCK0yXYBKo4=
@@ -37,6 +43,10 @@ github.com/lesomnus/mkot/pretty v0.0.0-20260222083905-204343130f4e h1:xFBJmXgqX0
 github.com/lesomnus/mkot/pretty v0.0.0-20260222083905-204343130f4e/go.mod h1:FEZ7rxTi0N+z4LZKH4/eFGMAcKzKY8Ib34SnatUZeMM=
 github.com/lesomnus/otx v0.0.0-20260119182817-de8acf8eaa8d h1:Mp/887AZBRNyVeJjB1awMJpe8+s4/UlOZXObr2XErcw=
 github.com/lesomnus/otx v0.0.0-20260119182817-de8acf8eaa8d/go.mod h1:h0eJnuDjF5rANbTUofqFv1DlsCcXuCXx7eVDb6b8fLI=
+github.com/lesomnus/otx/otxhttp v0.0.0-20260119182817-de8acf8eaa8d h1:JtULK7iOMgvSGIyMcaPnQncNRNVdHtyYbmRM8gIq+5s=
+github.com/lesomnus/otx/otxhttp v0.0.0-20260119182817-de8acf8eaa8d/go.mod h1:8TGk7Ayn5WCFGIOuf5eCq7lnhjVNSLEtGtdikNrtR5A=
+github.com/lesomnus/xddr v0.0.0-20260208135413-ea486b6aa52b h1:Sc/GSCamFFHgEWQME/zpQjjdL5t4HO7xsXiAExoiKmM=
+github.com/lesomnus/xddr v0.0.0-20260208135413-ea486b6aa52b/go.mod h1:FrVLMXRPmknQbOTF/dj1rtXTRTUgD4MN3zsifCiEFZc=
 github.com/lesomnus/xli v0.0.0-20251129214310-274b1fcfb863 h1:I6suMRRB5pcx54mXxLbZIrW0gWLHG6uqKCDcXoQbOak=
 github.com/lesomnus/xli v0.0.0-20251129214310-274b1fcfb863/go.mod h1:oKFLk2lsQenhuMqRdwgmDR9VwKKFnGbpoKtR9t5B628=
 github.com/lesomnus/z v0.0.0-20260310180618-50a9518cc8a9 h1:ig22cXNRyFKvq6GxN86ZFqO76vpPuQeV0MuirKhIG/w=
@@ -55,6 +65,8 @@ go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/contrib/bridges/otelslog v0.14.0 h1:eypSOd+0txRKCXPNyqLPsbSfA0jULgJcGmSAdFAnrCM=
 go.opentelemetry.io/contrib/bridges/otelslog v0.14.0/go.mod h1:CRGvIBL/aAxpQU34ZxyQVFlovVcp67s4cAmQu8Jh9mc=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 h1:ssfIgGNANqpVFCndZvcuyKbl0g+UAVcbBcqGkG28H0Y=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0/go.mod h1:GQ/474YrbE4Jx8gZ4q5I4hrhUzM6UPzyrqJYV2AqPoQ=
 go.opentelemetry.io/otel v1.39.0 h1:8yPrr/S0ND9QEfTfdP9V+SiwT4E0G7Y5MO7p85nis48=
 go.opentelemetry.io/otel v1.39.0/go.mod h1:kLlFTywNWrFyEdH0oj2xK0bFYZtHRYUdv1NklR/tgc8=
 go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.15.0 h1:W+m0g+/6v3pa5PgVf2xoFMi5YtNR06WtS7ve5pcvLtM=
