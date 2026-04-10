@@ -35,6 +35,7 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store := h.Stores.Use(id)
+	store = TraceStore{store}
 
 	d := Digest(digest_raw)
 	if d != "" {

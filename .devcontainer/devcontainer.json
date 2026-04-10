@@ -1,8 +1,8 @@
 {
 	"name": "lesomnus.flob",
-	"build": {
-		"dockerfile": "Dockerfile"
-	},
+	"dockerComposeFile": "docker-compose.yaml",
+	"service": "dev",
+	"workspaceFolder": "/workspace",
 	"customizations": {
 		"vscode": {
 			"extensions": [

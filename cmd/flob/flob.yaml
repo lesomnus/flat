@@ -13,4 +13,30 @@ server:
   # addr: 0.0.0.0:8080
 
 client:
-  # use: mem
+  # use: http/local
+
+otel:
+  # exporters:
+  #   pretty: {}
+  # providers:
+  #   logger:
+  #     exporters:
+  #       - pretty
+
+  exporters:
+    pretty: {}
+    otlp/local:
+      endpoint: localhost:4317
+      tls:
+        insecure: true
+      sending_queue:
+        enabled: false
+
+  providers:
+    tracer:
+      exporters:
+        - otlp/local
+    logger:
+      exporters:
+        - pretty
+        - otlp/local

@@ -9,7 +9,7 @@ type ClientConfig struct {
 }
 
 func (c *ClientConfig) Evaluate() error {
-	z.FallbackP(&c.Use, "mem")
+	z.FallbackP(&c.Use, "http/local")
 
 	return nil
 }

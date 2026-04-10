@@ -65,6 +65,18 @@ func configHandler() xli.Handler {
 			return z.Err(err, "read config")
 		}
 
+		stores := c.Stores
+		if _, ok := stores["os/cwd"]; !ok {
+			stores["os/cwd"] = &configs.StoresConfigOs{
+				Path: ".flob",
+			}
+		}
+		if _, ok := stores["http/local"]; !ok {
+			stores["http/local"] = &configs.StoresConfigHttp{
+				Target: "http://localhost:8080",
+			}
+		}
+
 		if err := c.Evaluate(); err != nil {
 			return z.Err(err, "evaluate config")
 		}
@@ -74,6 +86,9 @@ func configHandler() xli.Handler {
 			return z.Err(err, "build otel")
 		}
 		defer otx.Shutdown(ctx)
+		if err := otx.Start(ctx); err != nil {
+			return z.Err(err, "start otel")
+		}
 
 		l := log.From(ctx)
 		l.Info("config loaded", "path", c.path)

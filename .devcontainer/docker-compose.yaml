@@ -1,0 +1,38 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    command: sleep infinity
+
+    privileged: true
+
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: ${HOME}/workspaces
+        target: /workspaces
+
+      - type: volume
+        source: go.cache.mod
+        target: /home/hypnos/go/pkg/mod
+      - type: volume
+        source: go.cache.bin
+        target: /home/hypnos/.cache/go-build
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+          pids: 2048
+        reservations:
+          cpus: "2"
+          memory: 4G
+
+volumes:
+  go.cache.mod:
+  go.cache.bin:

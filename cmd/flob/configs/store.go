@@ -16,6 +16,10 @@ func (c StoresConfig) Use(name string) (flob.Stores, error) {
 }
 
 func (c StoresConfig) build(k string) (flob.Stores, error) {
+	if k == "mem" {
+		return flob.NewMemStores(), nil
+	}
+
 	v, ok := c[k]
 	if !ok {
 		return nil, fmt.Errorf("unknown store: %q", k)

@@ -3,7 +3,6 @@ package configs
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/lesomnus/flob/cmd/flob/version"
 	"github.com/lesomnus/mkot"
@@ -14,7 +13,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	_ "github.com/lesomnus/mkot/otlp"
-	_ "github.com/lesomnus/mkot/otlphttp"
 	"github.com/lesomnus/mkot/pretty"
 	_ "github.com/lesomnus/mkot/pretty"
 )
@@ -42,8 +40,8 @@ func (c *OtelConfig) Build(ctx context.Context) (context.Context, *otx.Otx, erro
 	if otc.Providers == nil {
 		otc.Providers = map[mkot.Id]*mkot.ProviderConfig{}
 	}
-	otc.Processors[ServiceResourceId] = &mkot.ResourceProcessor{
-		Attributes: []mkot.Attribute{
+	otc.Processors[ServiceResourceId] = &mkot.Resource{
+		Attributes: []mkot.Attr{
 			{Key: "service.name", Value: attribute.StringValue("flob")},
 			{Key: "service.version", Value: attribute.StringValue(version.Get().Version)},
 		},
@@ -51,9 +49,7 @@ func (c *OtelConfig) Build(ctx context.Context) (context.Context, *otx.Otx, erro
 	if len(otc.Providers) == 0 {
 		id := mkot.Id("pretty")
 		if _, ok := otc.Exporters[id]; !ok {
-			otc.Exporters[id] = &pretty.Config{
-				Output: os.Stderr,
-			}
+			otc.Exporters[id] = pretty.ExporterConfig{}
 		}
 		otc.Providers["logger"] = &mkot.ProviderConfig{
 			Exporters: []mkot.Id{id},
@@ -68,7 +64,7 @@ func (c *OtelConfig) Build(ctx context.Context) (context.Context, *otx.Otx, erro
 
 	tracker_provider, err := resolver.Tracer(ctx, "")
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, mkot.ErrNotExist) {
 			return nil, nil, z.Err(err, "resolve tracer provider")
 		}
 		tracker_provider = sdktrace.NewTracerProvider()
@@ -76,7 +72,7 @@ func (c *OtelConfig) Build(ctx context.Context) (context.Context, *otx.Otx, erro
 
 	// meter_provider, err := resolver.Meter(ctx, "")
 	// if err != nil {
-	// 	if !errors.Is(err, os.ErrNotExist) {
+	// 	if !errors.Is(err, mkot.ErrNotExist) {
 	// 		 nil,return nil, z.Err(err, "resolve meter provider")
 	// 	}
 	// 	meter_provider = noopmetric.NewMeterProvider()
@@ -84,12 +80,11 @@ func (c *OtelConfig) Build(ctx context.Context) (context.Context, *otx.Otx, erro
 
 	logger_provider, err := resolver.Logger(ctx, "")
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, mkot.ErrNotExist) {
 			return nil, nil, z.Err(err, "resolve logger provider")
 		}
 		logger_provider = nooplog.NewLoggerProvider()
 	}
-
 	v := otx.New(
 		otx.WithController(resolver),
 		otx.WithTracerProvider(tracker_provider),
