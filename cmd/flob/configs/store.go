@@ -1,21 +1,34 @@
 package configs
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/lesomnus/flob"
+	"github.com/lesomnus/otx/otxhttp"
 	"github.com/lesomnus/z"
 )
 
 type StoresConfig map[string]any
 
-func (c StoresConfig) Use(name string) (flob.Stores, error) {
-	return c.build(name)
+func (c StoresConfig) Use(ctx context.Context, name string) (flob.Stores, error) {
+	s, err := c.build(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
-func (c StoresConfig) build(k string) (flob.Stores, error) {
+func (c StoresConfig) build(ctx context.Context, k string) (s flob.Stores, err error) {
+	defer func() {
+		if s != nil {
+			s = StoresTrace{Stores: s}
+		}
+	}()
+
 	if k == "mem" {
 		return flob.NewMemStores(), nil
 	}
@@ -33,18 +46,21 @@ func (c StoresConfig) build(k string) (flob.Stores, error) {
 		return flob.NewOsStores(c_.Path), nil
 
 	case *StoresConfigHttp:
+		client := *http.DefaultClient
+		client.Transport = otxhttp.NewTransport(client.Transport)
+
 		return flob.HttpStores{
-			Client: http.DefaultClient,
+			Client: &client,
 			Target: c_.Target,
 		}, nil
 
 	case *StoresConfigCache:
-		primary, err := c.build(c_.Primary)
+		primary, err := c.build(ctx, c_.Primary)
 		if err != nil {
 			return nil, z.Err(err, "build primary store: %q", c_.Primary)
 		}
 
-		origin, err := c.build(c_.Origin)
+		origin, err := c.build(ctx, c_.Origin)
 		if err != nil {
 			return nil, z.Err(err, "build origin store: %q", c_.Origin)
 		}

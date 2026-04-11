@@ -36,6 +36,9 @@ otel:
     tracer:
       exporters:
         - otlp/local
+    meter:
+      exporters:
+        - otlp/local
     logger:
       exporters:
         - pretty

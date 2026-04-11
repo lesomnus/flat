@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
@@ -32,6 +33,9 @@ func NewCmdAdd() *xli.Command {
 
 			m, err := s.Use(id).Add(ctx, flob.Meta{}, f)
 			if err != nil {
+				if errors.Is(err, flob.ErrAlreadyExists) {
+					cmd.Println(m.Digest)
+				}
 				return z.Err(err, "op")
 			}
 

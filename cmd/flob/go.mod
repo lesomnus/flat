@@ -5,18 +5,19 @@ go 1.26.1
 require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/goccy/go-yaml v1.19.2
-	github.com/lesomnus/flob v0.0.0-20260409125149-185c893ea437
-	github.com/lesomnus/mkot v0.0.0-20260410213900-eac01920d7cb
-	github.com/lesomnus/mkot/otlp v0.0.0-20260410213900-eac01920d7cb
-	github.com/lesomnus/mkot/pretty v0.0.0-20260410213900-eac01920d7cb
-	github.com/lesomnus/otx v0.0.0-20260119182817-de8acf8eaa8d
-	github.com/lesomnus/otx/otxhttp v0.0.0-20260119182817-de8acf8eaa8d
+	github.com/lesomnus/flob v0.0.0-20260411133740-16c548f4ce96
+	github.com/lesomnus/mkot v0.0.0-20260411134429-03fb07dc35b4
+	github.com/lesomnus/mkot/otlp v0.0.0-20260411134429-03fb07dc35b4
+	github.com/lesomnus/mkot/pretty v0.0.0-20260411134429-03fb07dc35b4
+	github.com/lesomnus/otx v0.0.0-20260411134633-a35e9d32c8ef
+	github.com/lesomnus/otx/otxhttp v0.0.0-20260411134633-a35e9d32c8ef
 	github.com/lesomnus/xddr v0.0.0-20260208135413-ea486b6aa52b
 	github.com/lesomnus/xli v0.0.0-20251129214310-274b1fcfb863
 	github.com/lesomnus/z v0.0.0-20260310180618-50a9518cc8a9
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/log v0.19.0
-	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/metric v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 )
 
 require (
@@ -38,10 +39,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
-	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
-	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/net v0.53.0 // indirect

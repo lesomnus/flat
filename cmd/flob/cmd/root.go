@@ -31,7 +31,7 @@ func useClientStore(f func(ctx context.Context, cmd *xli.Command, s flob.Stores)
 	return xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 		c := use_config.Must(ctx)
 
-		s, err := c.Stores.Use(c.Client.Use)
+		s, err := c.Stores.Use(ctx, c.Client.Use)
 		if err != nil {
 			return z.Err(err, "build stores")
 		}
