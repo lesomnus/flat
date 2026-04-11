@@ -5,6 +5,7 @@ import (
 
 	"github.com/lesomnus/flob"
 	"github.com/lesomnus/xli"
+	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/z"
 )
 
@@ -12,12 +13,20 @@ func NewCmdRoot() *xli.Command {
 	return &xli.Command{
 		Name: "flob",
 
+		Flags: flg.Flags{
+			&flg.String{Name: "conf"},
+		},
+
 		Commands: []*xli.Command{
 			NewCmdConf(),
+			NewCmdVersion(),
 			NewCmdServe(),
+
+			NewCmdHash(),
 			NewCmdAdd(),
 			NewCmdGet(),
 			NewCmdRead(),
+			NewCmdErase(),
 		},
 
 		Handler: xli.Chain(
