@@ -1,0 +1,9 @@
+*
+!cmd/
+!internal/
+!*.go
+!go.mod
+!go.sum
+
+cmd/flob/go.work
+cmd/flob/go.work.sum
