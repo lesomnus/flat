@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/goccy/go-yaml v1.19.2
-	github.com/lesomnus/flob v0.0.0-20260412205048-52e1347562b6
+	github.com/lesomnus/flob v0.0.0-20260412210310-3c462dd2ab29
 	github.com/lesomnus/mkot v0.0.0-20260412100556-b20eef7dfe86
 	github.com/lesomnus/mkot/otlp v0.0.0-20260412100556-b20eef7dfe86
 	github.com/lesomnus/mkot/pretty v0.0.0-20260412100556-b20eef7dfe86
