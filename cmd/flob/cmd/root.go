@@ -38,7 +38,7 @@ func NewCmdRoot() *xli.Command {
 
 func useClientStore(f func(ctx context.Context, cmd *xli.Command, s flob.Stores) error) xli.Handler {
 	return xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-		c := use_config.Must(ctx)
+		c := UseConfig.Must(ctx)
 
 		s, err := c.Stores.Use(ctx, c.Client.Use)
 		if err != nil {

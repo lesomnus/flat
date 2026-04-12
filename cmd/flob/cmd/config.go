@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/lesomnus/flob/cmd/flob/configs"
+	"github.com/lesomnus/flob/cmd/configs"
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/flg"
@@ -14,7 +14,7 @@ import (
 	"github.com/lesomnus/z"
 )
 
-var use_config = z.NewUse[*Config]()
+var UseConfig = z.NewUse[*Config]()
 
 type Config struct {
 	path string
@@ -93,7 +93,7 @@ func configHandler() xli.Handler {
 		l := log.From(ctx)
 		l.Info("config loaded", "path", c.path)
 
-		ctx = use_config.Into(ctx, c)
+		ctx = UseConfig.Into(ctx, c)
 		return next(ctx)
 	})
 }

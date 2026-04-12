@@ -13,7 +13,7 @@ func NewCmdConf() *xli.Command {
 	return &xli.Command{
 		Name: "conf",
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-			c := use_config.Must(ctx)
+			c := UseConfig.Must(ctx)
 			data, err := yaml.MarshalWithOptions(c, yaml.Indent(2))
 			if err != nil {
 				return z.Err(err, "marshal")

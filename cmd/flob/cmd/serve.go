@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/lesomnus/flob"
-	"github.com/lesomnus/flob/cmd/flob/configs"
+	"github.com/lesomnus/flob/cmd/configs"
 	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/otx/otxhttp"
@@ -18,7 +18,7 @@ func NewCmdServe() *xli.Command {
 	return &xli.Command{
 		Name: "serve",
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-			c := use_config.Must(ctx)
+			c := UseConfig.Must(ctx)
 			s, err := c.Stores.Use(ctx, c.Server.Use)
 			if err != nil {
 				return z.Err(err, "use stores: %s", c.Server.Use)
