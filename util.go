@@ -2,7 +2,10 @@ package flob
 
 import (
 	"context"
+	"errors"
 	"io"
+
+	"github.com/opencontainers/go-digest"
 )
 
 var (
@@ -118,4 +121,81 @@ func (s FallbackStore) Label(ctx context.Context, d Digest, labels Labels) error
 
 func (s FallbackStore) Erase(ctx context.Context, d Digest) error {
 	return s.Primary.Erase(ctx, d)
+}
+
+type allowDuplicates struct {
+	Store
+}
+
+func AllowDuplicates(s Store) Store {
+	return allowDuplicates{Store: s}
+}
+
+func (s allowDuplicates) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
+	m, err := s.Store.Add(ctx, m, r)
+	if errors.Is(err, ErrAlreadyExists) {
+		return m, nil
+	}
+	return m, err
+}
+
+type checkExistence struct {
+	Store
+}
+
+func CheckExistence(s Store) Store {
+	return checkExistence{Store: s}
+}
+
+func (s checkExistence) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
+	if m.Digest != "" {
+		if m, err := s.Store.Get(ctx, m.Digest); err == nil {
+			return m, ErrAlreadyExists
+		}
+	}
+	return s.Store.Add(ctx, m, r)
+}
+
+type prepareDigest struct {
+	Store
+	algo digest.Algorithm
+}
+
+func PrepareDigest(s Store, algo digest.Algorithm) Store {
+	if algo == "" {
+		algo = Canonical
+	}
+	return prepareDigest{s, algo}
+}
+
+func (s prepareDigest) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
+	if m.Digest != "" {
+		if rs, ok := r.(io.ReadSeeker); ok {
+			if d, err := s.hash(rs); err != nil {
+				m.Digest = d
+			} else {
+				// Reader is touched but failed to take back to the original position, so we return
+				// an error instead of proceeding with a potentially corrupted reader.
+				return Meta{}, err
+			}
+		}
+	}
+	return s.Store.Add(ctx, m, r)
+}
+
+func (s prepareDigest) hash(r io.ReadSeeker) (Digest, error) {
+	c, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return "", nil
+	}
+
+	d := Digest("")
+	h := s.algo.Digester()
+	if _, err = io.Copy(h.Hash(), r); err == nil {
+		d = Digest(h.Digest())
+	}
+	if _, err = r.Seek(c, io.SeekStart); err != nil {
+		return d, err
+	}
+	return d, nil
 }

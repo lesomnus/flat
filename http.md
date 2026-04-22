@@ -44,7 +44,7 @@ POST /{store-id}/{digest}
 
 Uploads a new blob. The request body is the blob content.
 Labels are specified as `Flob-<Key>` request headers.
-If a blob with the same digest already exists, the server returns `409 Conflict`.
+If no blob with the same digest exists, respond with `201 Created` along with a `Location` header pointing to the new blob; otherwise, respond with `200 OK`.
 
 When a digest is provided in the path, it is verified against the computed digest.
 If they do not match, the server returns `422 Unprocessable Content`.

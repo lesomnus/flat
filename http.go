@@ -62,9 +62,9 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusNotFound)
 			case errors.Is(err, ErrAlreadyExists):
 				h.setMetaHeaders(w, m)
-				http.Error(w, err.Error(), http.StatusConflict)
+				w.WriteHeader(http.StatusOK)
 			case errors.Is(err, ErrDigestMismatch):
-				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+				http.Error(w, err.Error(), http.StatusPreconditionFailed)
 			default:
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
@@ -215,10 +215,17 @@ func (s HttpStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 	defer res.Body.Close()
 
 	m = s.parseMeta(res)
-	if err := s.parseErr(res); err != nil {
-		return m, err
+	switch res.StatusCode {
+	case http.StatusOK:
+		err = ErrAlreadyExists
+	case http.StatusCreated:
+		err = nil
+	case http.StatusPreconditionFailed:
+		err = ErrDigestMismatch
+	default:
+		err = fmt.Errorf("unexpected HTTP status: %s", res.Status)
 	}
-	return m, nil
+	return m, err
 }
 
 func (s HttpStore) Get(ctx context.Context, d Digest) (Meta, error) {
@@ -302,9 +309,7 @@ func (HttpStore) parseErr(res *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		return ErrNotExist
-	case http.StatusConflict:
-		return ErrAlreadyExists
-	case http.StatusUnprocessableEntity:
+	case http.StatusPreconditionFailed:
 		return ErrDigestMismatch
 	default:
 		return fmt.Errorf("unexpected HTTP status: %s", res.Status)
