@@ -35,6 +35,17 @@ And returned in a response as:
 Foo: bar
 ```
 
+### Reserved header names
+
+Because labels travel as plain HTTP headers in responses, a label whose (canonicalized) key
+collides with a header the transport itself uses is **not carried over the HTTP transport**.
+This includes `Content-Type`, `Content-Length`, `ETag`, `Content-Range`, `Accept-Ranges`,
+`Last-Modified`, `Vary`, `Cache-Control`, `Date`, `Server`, `Connection`, `Transfer-Encoding`,
+and `Content-Encoding`. Such keys are dropped from the labels returned by `GET`/`HEAD` (they
+would otherwise be indistinguishable from, or clobber, transport headers). Use label keys that
+do not collide with standard HTTP headers when going through the HTTP transport. The
+filesystem and in-memory stores have no such restriction.
+
 ## Upload a Blob
 
 ```
@@ -45,6 +56,10 @@ POST /{store-id}/{digest}
 Uploads a new blob. The request body is the blob content.
 Labels are specified as `Flob-<Key>` request headers.
 If no blob with the same digest exists, respond with `201 Created` along with a `Location` header pointing to the new blob; otherwise, respond with `200 OK`.
+
+On the `200 OK` (already-exists) response the existing blob is intentionally not re-read, so
+the response carries only partial metadata: the `ETag` (digest) is set, but `Content-Length`
+may be reported as `0`. Use `HEAD` to obtain the authoritative size of an existing blob.
 
 When a digest is provided in the path, it is verified against the computed digest.
 If they do not match, the server returns `422 Unprocessable Content`.

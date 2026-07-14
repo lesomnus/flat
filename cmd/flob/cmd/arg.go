@@ -81,7 +81,11 @@ func (d DigestResolver) Resolve(r io.Reader) (flob.Digest, error) {
 		if _, err := io.Copy(h, r); err != nil {
 			return "", fmt.Errorf("hash: %w", err)
 		}
-		v = hex.EncodeToString(h.Sum(nil))
+		v = "sha256:" + hex.EncodeToString(h.Sum(nil))
+	} else if !strings.Contains(v, ":") {
+		// Accept a bare hex digest without an "algo:" prefix by assuming sha256, so a
+		// digest printed by `flob add` (and the shorthand in the docs) round-trips.
+		v = "sha256:" + v
 	}
 
 	return flob.Digest(v).Sanitize()

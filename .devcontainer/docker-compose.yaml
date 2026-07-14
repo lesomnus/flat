@@ -9,19 +9,12 @@ services:
     privileged: true
 
     volumes:
-      - type: bind
-        source: ..
-        target: /workspace
-      - type: bind
-        source: ${HOME}/workspaces
-        target: /workspaces
+      - command.history:/commandhistory
+      - go.cache.mod:/go/pkg/mod
+      - go.cache.bin:/home/hypnos/.cache/go-build
 
-      - type: volume
-        source: go.cache.mod
-        target: /home/hypnos/go/pkg/mod
-      - type: volume
-        source: go.cache.bin
-        target: /home/hypnos/.cache/go-build
+      - ${HDAY_HOME:-../../../..}:/workspace
+      - ${HOME}/workspaces:/workspaces
 
     deploy:
       resources:
@@ -34,5 +27,6 @@ services:
           memory: 4G
 
 volumes:
+  command.history:
   go.cache.mod:
   go.cache.bin:

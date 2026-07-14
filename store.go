@@ -3,7 +3,6 @@ package flob
 import (
 	"context"
 	"io"
-	"maps"
 )
 
 type Stores interface {
@@ -42,6 +41,6 @@ type Meta struct {
 
 func (m *Meta) Clone() Meta {
 	m_ := *m
-	m_.Labels = maps.Clone(m.Labels)
+	m_.Labels = cloneLabels(m.Labels)
 	return m_
 }

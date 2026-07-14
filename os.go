@@ -200,12 +200,39 @@ func (s OsStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 	if err := os.MkdirAll(filepath.Dir(pr), 0o755); err != nil {
 		return m, fmt.Errorf("mkdir repo: %w", err)
 	}
-	if err := os.Rename(ps, pr); err != nil {
-		return m, fmt.Errorf("move from stage to repo: %w", err)
+	if err := s.moveStageToRepo(ps, pr); err != nil {
+		return m, err
 	}
 
 	ok = true
 	return m, nil
+}
+
+// moveStageToRepo atomically moves the fully-staged directory ps onto the repo digest
+// directory pr.
+//
+// os.Rename onto an already-existing directory fails (EEXIST/ENOTEMPTY), so a leftover pr
+// — from a crash mid-Erase (RemoveAll unlinks blob, then labels, then the dir) or from a
+// raced concurrent Add/Erase/Label on the same digest — would otherwise make the user's Add
+// fail permanently. Because we hold the per-digest blob lock and checkDup already confirmed
+// pr has no valid blob, any pre-existing pr is orphan state we are entitled to replace: we
+// remove it and retry so the Add always succeeds.
+func (s OsStore) moveStageToRepo(ps, pr string) error {
+	const attempts = 5
+	var err error
+	for range attempts {
+		if err = os.Rename(ps, pr); err == nil {
+			return nil
+		}
+		if _, statErr := os.Stat(pr); statErr != nil {
+			// pr does not exist, so the failure is not a leftover-collision; do not retry.
+			return fmt.Errorf("move from stage to repo: %w", err)
+		}
+		if rmErr := os.RemoveAll(pr); rmErr != nil {
+			return fmt.Errorf("remove leftover repo dir: %w", rmErr)
+		}
+	}
+	return fmt.Errorf("move from stage to repo after %d attempts: %w", attempts, err)
 }
 
 func (s OsStore) Get(ctx context.Context, d Digest) (m Meta, err error) {
@@ -232,8 +259,16 @@ func (s OsStore) Open(ctx context.Context, d Digest) (io.ReadSeekCloser, Meta, e
 }
 
 func (s OsStore) Label(ctx context.Context, d Digest, labels Labels) error {
-	// Check if the blob exists first to avoid unnecessary work.
-	p := s.pathToRepo(d)
+	d, err := d.Sanitize()
+	if err != nil {
+		// An invalid digest cannot correspond to any stored blob.
+		return ErrNotExist
+	}
+
+	// Check if the blob exists first to avoid unnecessary work. Existence is defined by the
+	// presence of the `blob` file — the same criterion Get/Open/open use — not by the repo
+	// directory, so an orphan labels-only directory is treated as "not exist" consistently.
+	p := s.pathToRepo(d, "blob")
 	if _, err := os.Stat(p); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return ErrNotExist
@@ -298,6 +333,13 @@ func (s OsStore) Label(ctx context.Context, d Digest, labels Labels) error {
 // before Rename completes, leaving the repo entry's hard link as the sole surviving
 // inode — an orphan.
 func (s OsStore) Erase(ctx context.Context, d Digest) error {
+	d, err := d.Sanitize()
+	if err != nil {
+		// An invalid digest cannot correspond to any stored blob; treat as a no-op so the
+		// user's Erase request always succeeds (Erase never reports "not exist" anyway).
+		return nil
+	}
+
 	pr := s.pathToRepo(d)
 	if err := os.RemoveAll(pr); err != nil && !os.IsNotExist(err) {
 		return err
@@ -348,6 +390,12 @@ func (s OsStore) tryCleanup(ctx context.Context, d Digest) (bool, error) {
 }
 
 func (s OsStore) open(_ context.Context, d Digest) (pb string, m Meta, err error) {
+	if d, err = d.Sanitize(); err != nil {
+		// An invalid digest cannot correspond to any stored blob, and building a path from
+		// it would panic in go-digest, so report it as missing.
+		return "", Meta{}, ErrNotExist
+	}
+
 	pb = s.pathToRepo(d, "blob")
 	pl := s.pathToRepo(d, "labels")
 

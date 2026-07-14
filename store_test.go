@@ -1,6 +1,7 @@
 package flob
 
 import (
+	"bytes"
 	"io"
 	"testing"
 
@@ -57,6 +58,113 @@ func testStore(t *testing.T, new_stores newStoresFn) {
 		_, err := s.Get(ctx, digest_nil)
 		x.ErrorIs(err, ErrNotExist)
 	})
+	t.Run("add with matching digest succeeds", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		added, err := s.Add(ctx, Meta{Digest: Digest(x.Digest())}, x.Reader())
+		x.NoError(err)
+		x.Eq(x.Digest(), string(added.Digest))
+
+		got, err := s.Get(ctx, added.Digest)
+		x.NoError(err)
+		x.Eq(added.Digest, got.Digest)
+	})
+	t.Run("add with mismatched digest returns ErrDigestMismatch", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		// digest_nil is a well-formed digest that does not match the content.
+		_, err := s.Add(ctx, Meta{Digest: digest_nil}, x.Reader())
+		x.ErrorIs(err, ErrDigestMismatch)
+
+		// The failed Add must not have stored anything.
+		_, err = s.Get(ctx, Digest(x.Digest()))
+		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("add pre-supplied digest of existing returns ErrAlreadyExists", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		m, err := s.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		got, err := s.Add(ctx, Meta{Digest: m.Digest}, x.Reader())
+		x.ErrorIs(err, ErrAlreadyExists)
+		x.Eq(m.Digest, got.Digest)
+	})
+	t.Run("open content matches the requested digest", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		m, err := s.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		r, _, err := s.Open(ctx, m.Digest)
+		x.NoError(err)
+		defer r.Close()
+
+		got, err := io.ReadAll(r)
+		x.NoError(err)
+		x.Eq(m.Digest, DigestFromBytes(got))
+	})
+	t.Run("erase then re-add succeeds", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		m, err := s.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		err = s.Erase(ctx, m.Digest)
+		x.NoError(err)
+
+		_, err = s.Get(ctx, m.Digest)
+		x.ErrorIs(err, ErrNotExist)
+
+		// Re-adding the same content after erase must succeed, not fail with a leftover.
+		m2, err := s.Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+		x.Eq(m.Digest, m2.Digest)
+
+		got, err := s.Get(ctx, m2.Digest)
+		x.NoError(err)
+		x.Eq(m.Digest, got.Digest)
+	})
+	t.Run("add empty content roundtrips", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		m, err := s.Add(ctx, Meta{}, bytes.NewReader(nil))
+		x.NoError(err)
+		x.Eq(int64(0), m.Size)
+
+		r, gm, err := s.Open(ctx, m.Digest)
+		x.NoError(err)
+		defer r.Close()
+		x.Eq(int64(0), gm.Size)
+
+		got, err := io.ReadAll(r)
+		x.NoError(err)
+		x.Eq(0, len(got))
+	})
+	t.Run("returned labels are isolated from the stored copy", func(t *testing.T) {
+		ctx, x := x.New(t)
+		s := new_store(t)
+
+		added, err := s.Add(ctx, Meta{Labels: Labels{"Media-Type": {"text/plain"}}}, x.Reader())
+		x.NoError(err)
+
+		// Mutating a returned label must not leak into the store's own copy.
+		got, err := s.Get(ctx, added.Digest)
+		x.NoError(err)
+		if vs := got.Labels["Media-Type"]; len(vs) > 0 {
+			vs[0] = "MUTATED"
+		}
+
+		again, err := s.Get(ctx, added.Digest)
+		x.NoError(err)
+		x.Eq("text/plain", again.Labels.Get("Media-Type"))
+	})
 	t.Run("open returns same content after add", func(t *testing.T) {
 		ctx, x := x.New(t)
 		s := new_store(t)
@@ -76,22 +184,22 @@ func testStore(t *testing.T, new_stores newStoresFn) {
 		ctx, x := x.New(t)
 		s := new_store(t)
 
-		labels_init := Labels{"Content-Type": {"text/plain"}, "Version": {"1"}}
+		labels_init := Labels{"Media-Type": {"text/plain"}, "Version": {"1"}}
 		added, err := s.Add(ctx, Meta{Labels: labels_init}, x.Reader())
 		x.NoError(err)
 
 		got, err := s.Get(ctx, added.Digest)
 		x.NoError(err)
-		x.Eq(labels_init.Get("Content-Type"), got.Labels.Get("Content-Type"))
+		x.Eq(labels_init.Get("Media-Type"), got.Labels.Get("Media-Type"))
 		x.Eq(labels_init.Get("Version"), got.Labels.Get("Version"))
 
-		labels_new := Labels{"Content-Type": {"application/json"}, "Version": {"2"}, "Author": {"test"}}
+		labels_new := Labels{"Media-Type": {"application/json"}, "Version": {"2"}, "Author": {"test"}}
 		err = s.Label(ctx, added.Digest, labels_new)
 		x.NoError(err)
 
 		got, err = s.Get(ctx, added.Digest)
 		x.NoError(err)
-		x.Eq(labels_new.Get("Content-Type"), got.Labels.Get("Content-Type"))
+		x.Eq(labels_new.Get("Media-Type"), got.Labels.Get("Media-Type"))
 		x.Eq(labels_new.Get("Version"), got.Labels.Get("Version"))
 		x.Eq(labels_new.Get("Author"), got.Labels.Get("Author"))
 	})
@@ -195,8 +303,8 @@ func testStore(t *testing.T, new_stores newStoresFn) {
 		x.NoError(err)
 		x.Eq(m1.Digest, m2.Digest)
 
-		labels_a := Labels{"Content-Type": {"text/plain"}, "Repo": {"a"}}
-		labels_b := Labels{"Content-Type": {"application/json"}, "Repo": {"b"}}
+		labels_a := Labels{"Media-Type": {"text/plain"}, "Repo": {"a"}}
+		labels_b := Labels{"Media-Type": {"application/json"}, "Repo": {"b"}}
 
 		err = s1.Label(ctx, m1.Digest, labels_a)
 		x.NoError(err)
@@ -208,9 +316,9 @@ func testStore(t *testing.T, new_stores newStoresFn) {
 		got_b, err := s2.Get(ctx, m2.Digest)
 		x.NoError(err)
 
-		x.Eq(labels_a.Get("Content-Type"), got_a.Labels.Get("Content-Type"))
+		x.Eq(labels_a.Get("Media-Type"), got_a.Labels.Get("Media-Type"))
 		x.Eq(labels_a.Get("Repo"), got_a.Labels.Get("Repo"))
-		x.Eq(labels_b.Get("Content-Type"), got_b.Labels.Get("Content-Type"))
+		x.Eq(labels_b.Get("Media-Type"), got_b.Labels.Get("Media-Type"))
 		x.Eq(labels_b.Get("Repo"), got_b.Labels.Get("Repo"))
 	})
 }

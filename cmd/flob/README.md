@@ -7,7 +7,7 @@
 - `STORE_ID` is the store identifier. It is used to specify which store to operate on.
 - `DIGEST` is the digest of the blob. It is used to specify which blob to operate on.
 	
-	The digest can be specified in the 32-character hexadecimal format or a filepath.
+	The digest can be specified as a 64-character hexadecimal SHA-256 string (with or without the `sha256:` prefix) or a filepath.
 	Input is treated as a filepath if it starts with a slash (`/`) or a dot (`.`), or if it is `-` (standard input) and if a filepath is provided, the digest will be calculated from the file content.
 
 - `FILE` is the file path. It is used to specify the file to read from.

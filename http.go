@@ -64,7 +64,7 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.setMetaHeaders(w, m)
 				w.WriteHeader(http.StatusOK)
 			case errors.Is(err, ErrDigestMismatch):
-				http.Error(w, err.Error(), http.StatusPreconditionFailed)
+				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			default:
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
@@ -220,8 +220,10 @@ func (s HttpStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 		err = ErrAlreadyExists
 	case http.StatusCreated:
 		err = nil
-	case http.StatusPreconditionFailed:
+	case http.StatusUnprocessableEntity:
 		err = ErrDigestMismatch
+	case http.StatusNotFound:
+		err = ErrNotExist
 	default:
 		err = fmt.Errorf("unexpected HTTP status: %s", res.Status)
 	}
@@ -309,7 +311,7 @@ func (HttpStore) parseErr(res *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		return ErrNotExist
-	case http.StatusPreconditionFailed:
+	case http.StatusUnprocessableEntity:
 		return ErrDigestMismatch
 	default:
 		return fmt.Errorf("unexpected HTTP status: %s", res.Status)
@@ -336,6 +338,7 @@ func (HttpStore) parseMeta(res *http.Response) Meta {
 var meta_headers_to_skip = map[string]bool{
 	"Etag":              true,
 	"Content-Length":    true,
+	"Content-Type":      true,
 	"Transfer-Encoding": true,
 	"Content-Encoding":  true,
 	"Date":              true,

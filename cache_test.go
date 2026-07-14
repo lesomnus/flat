@@ -1,12 +1,33 @@
 package flob
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/lesomnus/flob/internal/x"
 )
+
+// nonDrainingStores is a primary that never holds the blob (Open/Get always miss) and whose
+// Add returns immediately WITHOUT reading the supplied reader — mimicking a primary that
+// short-circuits because the blob was committed concurrently. It exercises the blobTap path
+// where Primary.Add does not drain the tee pipe.
+type nonDrainingStores struct{}
+
+func (nonDrainingStores) Use(string) Store { return nonDrainingStore{} }
+
+type nonDrainingStore struct{}
+
+func (nonDrainingStore) Add(context.Context, Meta, io.Reader) (Meta, error) {
+	return Meta{}, ErrAlreadyExists
+}
+func (nonDrainingStore) Get(context.Context, Digest) (Meta, error) { return Meta{}, ErrNotExist }
+func (nonDrainingStore) Open(context.Context, Digest) (io.ReadSeekCloser, Meta, error) {
+	return nil, Meta{}, ErrNotExist
+}
+func (nonDrainingStore) Label(context.Context, Digest, Labels) error { return ErrNotExist }
+func (nonDrainingStore) Erase(context.Context, Digest) error         { return nil }
 
 func TestCacheStore(t *testing.T) {
 	new_stores := func(t *testing.T) Stores {
@@ -78,6 +99,37 @@ func TestCacheStore(t *testing.T) {
 
 		_, err = s.Primary.Get(ctx, m.Digest)
 		x.NoError(err)
+	})
+	t.Run("open does not deadlock when primary add short-circuits", func(t *testing.T) {
+		ctx, x := x.New(t)
+
+		origin := NewMemStores()
+		m, err := origin.Use("t").Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		// Primary.Open misses (so Open taps the origin read), but Primary.Add returns
+		// immediately without draining the tee pipe. Before the fix, blobTap.Read blocked
+		// forever on the unbuffered pipe write and the caller's read hung.
+		s := CacheStores{Primary: nonDrainingStores{}, Origin: origin}.Use("t")
+
+		done := make(chan []byte, 1)
+		go func() {
+			r, _, err := s.Open(ctx, m.Digest)
+			if err != nil {
+				done <- nil
+				return
+			}
+			data, _ := io.ReadAll(r)
+			r.Close()
+			done <- data
+		}()
+
+		select {
+		case data := <-done:
+			x.Eq(x.Data(), data)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Open deadlocked: blobTap.Read blocked on a pipe the primary never drains")
+		}
 	})
 	t.Run("add does not affect origin", func(t *testing.T) {
 		ctx, x := x.New(t)

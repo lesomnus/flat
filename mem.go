@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"sync"
 	"sync/atomic"
 )
@@ -99,7 +98,7 @@ func (s *MemStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 
 	e := &memEntry{blob: b}
 	if m.Labels != nil {
-		ls := maps.Clone(m.Labels)
+		ls := cloneLabels(m.Labels)
 		e.labels.Store(&ls)
 	}
 
@@ -140,7 +139,7 @@ func (s *MemStore) open(d Digest) (*memEntry, Meta, error) {
 		Size:   int64(len(entry.blob.data)),
 	}
 	if ls != nil {
-		m.Labels = maps.Clone(*ls)
+		m.Labels = cloneLabels(*ls)
 	}
 
 	return entry, m, nil
@@ -159,7 +158,7 @@ func (s *MemStore) Label(ctx context.Context, d Digest, labels Labels) error {
 	// Serialising Label and Erase is intentionally not implemented.
 
 	entry := v.(*memEntry)
-	ls := maps.Clone(labels)
+	ls := cloneLabels(labels)
 	entry.labels.Store(&ls)
 
 	return nil

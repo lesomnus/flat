@@ -66,7 +66,14 @@ func (s CacheStore) Open(ctx context.Context, d Digest) (io.ReadSeekCloser, Meta
 	}
 
 	r, sink := newBlobTap(r)
-	go s.Primary.Add(ctx, m, sink) // Ignore error.
+	go func() {
+		// Ignore error: caching is best-effort.
+		s.Primary.Add(ctx, m, sink)
+		// Close the read end so that if Add returned without draining the pipe (e.g.
+		// the blob already exists in the primary and Add short-circuits), the pending
+		// blobTap.Read write unblocks with io.ErrClosedPipe instead of hanging forever.
+		sink.Close()
+	}()
 
 	return r, m, nil
 }
@@ -85,7 +92,7 @@ type blobTap struct {
 	m Meta
 }
 
-func newBlobTap(src io.ReadSeekCloser) (*blobTap, io.Reader) {
+func newBlobTap(src io.ReadSeekCloser) (*blobTap, *io.PipeReader) {
 	r, w := io.Pipe()
 	return &blobTap{w: w, r: src}, r
 }

@@ -171,13 +171,14 @@ func PrepareDigest(s Store, algo digest.Algorithm) Store {
 func (s prepareDigest) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 	if m.Digest != "" {
 		if rs, ok := r.(io.ReadSeeker); ok {
-			if d, err := s.hash(rs); err != nil {
-				m.Digest = d
-			} else {
-				// Reader is touched but failed to take back to the original position, so we return
-				// an error instead of proceeding with a potentially corrupted reader.
+			d, err := s.hash(rs)
+			if err != nil {
+				// Reader is touched but hashing failed or it could not be taken back to the
+				// original position, so we return an error instead of proceeding with a
+				// potentially corrupted reader.
 				return Meta{}, err
 			}
+			m.Digest = d
 		}
 	}
 	return s.Store.Add(ctx, m, r)
@@ -186,16 +187,18 @@ func (s prepareDigest) Add(ctx context.Context, m Meta, r io.Reader) (Meta, erro
 func (s prepareDigest) hash(r io.ReadSeeker) (Digest, error) {
 	c, err := r.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
-	d := Digest("")
 	h := s.algo.Digester()
-	if _, err = io.Copy(h.Hash(), r); err == nil {
-		d = Digest(h.Digest())
+	if _, err := io.Copy(h.Hash(), r); err != nil {
+		// Best-effort restore of the position, but surface the copy error.
+		_, _ = r.Seek(c, io.SeekStart)
+		return "", err
 	}
-	if _, err = r.Seek(c, io.SeekStart); err != nil {
-		return d, err
+	d := Digest(h.Digest())
+	if _, err := r.Seek(c, io.SeekStart); err != nil {
+		return "", err
 	}
 	return d, nil
 }
