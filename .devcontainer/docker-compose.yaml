@@ -3,17 +3,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-
     command: sleep infinity
 
+    user: "1000"
     privileged: true
+    environment:
+      - SHELL=/bin/zsh
 
     volumes:
       - command.history:/commandhistory
       - go.cache.mod:/go/pkg/mod
       - go.cache.bin:/home/hypnos/.cache/go-build
 
-      - ${HDAY_HOME:-../../../..}:/workspace
+      - ..:/workspace
       - ${HOME}/workspaces:/workspaces
 
     deploy:

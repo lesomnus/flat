@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/goccy/go-yaml/ast"
@@ -72,6 +73,24 @@ func (c StoresConfig) build(ctx context.Context, k string) (s flob.Stores, err e
 			Origin:  origin,
 		}, nil
 
+	case *StoresConfigS3:
+		stores, err := flob.NewS3Stores(flob.S3Config{
+			Endpoint:     c_.Endpoint,
+			Region:       orEnv(c_.Region, "AWS_REGION"),
+			Bucket:       c_.Bucket,
+			Prefix:       c_.Prefix,
+			UsePathStyle: c_.PathStyle,
+			Credentials: flob.Credentials{
+				AccessKeyID:     orEnv(c_.AccessKeyID, "AWS_ACCESS_KEY_ID"),
+				SecretAccessKey: orEnv(c_.SecretAccessKey, "AWS_SECRET_ACCESS_KEY"),
+				SessionToken:    orEnv(c_.SessionToken, "AWS_SESSION_TOKEN"),
+			},
+		})
+		if err != nil {
+			return nil, z.Err(err, "build s3 store")
+		}
+		return stores, nil
+
 	case *StoreConfigFallback:
 		if c_.Secondary == "" {
 			c_.Secondary = c_.Primary
@@ -111,6 +130,7 @@ func (c StoresConfig) UnmarshalYAML(f func(v any) error) error {
 		"os":       StoresConfigOs{},
 		"cache":    StoresConfigCache{},
 		"http":     StoresConfigHttp{},
+		"s3":       StoresConfigS3{},
 		"fallback": StoreConfigFallback{},
 	}
 	for k, v := range c_ {
@@ -140,6 +160,39 @@ type StoresConfigOs struct {
 
 type StoresConfigHttp struct {
 	Target string
+}
+
+// StoresConfigS3 configures a store backed by an S3 bucket. Credentials and the
+// region fall back to the standard AWS_* environment variables when left empty,
+// so secrets need not be written into the config file.
+type StoresConfigS3 struct {
+	// Endpoint is the S3 service URL, e.g. "https://s3.us-east-1.amazonaws.com"
+	// or "http://localhost:9000". Empty uses the AWS endpoint for Region.
+	Endpoint string `yaml:"endpoint,omitempty"`
+	// Region is the AWS region; falls back to $AWS_REGION.
+	Region string `yaml:"region,omitempty"`
+	// Bucket holds every store. Required.
+	Bucket string `yaml:"bucket"`
+	// Prefix is an optional key prefix within the bucket.
+	Prefix string `yaml:"prefix,omitempty"`
+	// PathStyle selects host/bucket/key addressing; required for MinIO and most
+	// S3-compatible servers.
+	PathStyle bool `yaml:"path_style,omitempty"`
+	// AccessKeyID falls back to $AWS_ACCESS_KEY_ID.
+	AccessKeyID string `yaml:"access_key_id,omitempty"`
+	// SecretAccessKey falls back to $AWS_SECRET_ACCESS_KEY.
+	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+	// SessionToken falls back to $AWS_SESSION_TOKEN; only for temporary creds.
+	SessionToken string `yaml:"session_token,omitempty"`
+}
+
+// orEnv returns v if non-empty, otherwise the value of the named environment
+// variable.
+func orEnv(v, env string) string {
+	if v != "" {
+		return v
+	}
+	return os.Getenv(env)
 }
 
 type StoresConfigCache struct {

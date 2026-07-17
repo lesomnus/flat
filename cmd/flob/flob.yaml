@@ -7,6 +7,16 @@ stores:
   #   path: .flob
   # http/local:
   #   target: http://localhost:8080
+  # s3/main:
+  #   # endpoint: https://s3.us-east-1.amazonaws.com  # omit to derive from region
+  #   region: us-east-1
+  #   bucket: my-blobs
+  #   prefix: flob                 # optional key prefix within the bucket
+  #   path_style: false            # true for MinIO and most S3-compatible servers
+  #   # Credentials and region fall back to AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
+  #   # AWS_SESSION_TOKEN / AWS_REGION when omitted, so secrets can stay out of the file.
+  #   # access_key_id: ...
+  #   # secret_access_key: ...
 
 server:
   # use: mem
