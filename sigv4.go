@@ -14,7 +14,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,6 +134,62 @@ func (s signer) sign(req *http.Request, payloadHash string) {
 		"Credential="+s.creds.AccessKeyID+"/"+scope+", "+
 		"SignedHeaders="+signedHeaders+", "+
 		"Signature="+signature)
+}
+
+// unsignedPayload is the x-amz-content-sha256 sentinel used for presigned URLs,
+// where the body hash is not known (and not signed) at URL-generation time.
+const unsignedPayload = "UNSIGNED-PAYLOAD"
+
+// presignMaxExpiry is the SigV4 upper bound on X-Amz-Expires (7 days).
+const presignMaxExpiry = 7 * 24 * time.Hour
+
+// presignQuery builds the SigV4 "query string" signature for a presigned URL and
+// returns the full canonical query string with the trailing X-Amz-Signature
+// appended. canonicalURI is the SigV4-encoded request path (as produced for
+// [signer.sign] via req.URL.Opaque); host is the value bound into the sole signed
+// header. Only the host header is signed, so the resulting URL needs no extra
+// request headers to remain valid. expires is clamped to [1s, presignMaxExpiry].
+func (s signer) presignQuery(method, canonicalURI, host string, expires time.Duration) string {
+	t := s.now().UTC()
+	amzDate := t.Format("20060102T150405Z")
+	dateStamp := t.Format("20060102")
+	scope := dateStamp + "/" + s.region + "/" + s.service + "/aws4_request"
+
+	if expires < time.Second {
+		expires = time.Second
+	} else if expires > presignMaxExpiry {
+		expires = presignMaxExpiry
+	}
+
+	q := url.Values{}
+	q.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+	q.Set("X-Amz-Credential", s.creds.AccessKeyID+"/"+scope)
+	q.Set("X-Amz-Date", amzDate)
+	q.Set("X-Amz-Expires", strconv.FormatInt(int64(expires.Seconds()), 10))
+	q.Set("X-Amz-SignedHeaders", "host")
+	if s.creds.SessionToken != "" {
+		q.Set("X-Amz-Security-Token", s.creds.SessionToken)
+	}
+	canonicalQueryString := canonicalQuery(q)
+
+	canonicalRequest := strings.Join([]string{
+		method,
+		canonicalURI,
+		canonicalQueryString,
+		"host:" + host + "\n",
+		"host",
+		unsignedPayload,
+	}, "\n")
+
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		scope,
+		hexSHA256([]byte(canonicalRequest)),
+	}, "\n")
+
+	signature := hex.EncodeToString(hmacSHA256(s.signingKey(dateStamp), stringToSign))
+	return canonicalQueryString + "&X-Amz-Signature=" + signature
 }
 
 // signingKey derives the date/region/service-scoped signing key.

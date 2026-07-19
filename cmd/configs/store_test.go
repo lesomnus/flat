@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/lesomnus/flob"
@@ -58,6 +59,63 @@ s3/main:
 	}
 	if !strings.HasPrefix(gotAuth, "AWS4-HMAC-SHA256 ") {
 		t.Fatalf("authorization = %q", gotAuth)
+	}
+}
+
+func TestStoresConfigS3PublicEndpoint(t *testing.T) {
+	doc := `
+s3/main:
+  bucket: b
+  path_style: true
+  public_endpoint: https://cdn.example.com
+`
+	c := StoresConfig{}
+	if err := yaml.Unmarshal([]byte(doc), &c); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	s3c, ok := c["s3/main"].(*StoresConfigS3)
+	if !ok {
+		t.Fatalf("s3 config type = %T", c["s3/main"])
+	}
+	if s3c.PublicEndpoint != "https://cdn.example.com" {
+		t.Fatalf("public_endpoint = %q", s3c.PublicEndpoint)
+	}
+	if _, err := c.build(context.Background(), "s3/main"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+}
+
+// fakePresignStore implements flob.Store (via the unimplemented base) plus
+// flob.Presigner, standing in for the S3 store.
+type fakePresignStore struct{ flob.UnimplementedStore }
+
+func (fakePresignStore) PresignOpen(ctx context.Context, d flob.Digest, ttl time.Duration) (string, flob.Meta, error) {
+	return "https://example.test/presigned", flob.Meta{Digest: d}, nil
+}
+
+// TestPresignerSurvivesTraceAndMeterWrapping guards the exact production wiring:
+// serve.go hands the handler a store wrapped in StoresTrace and then StoresMeter.
+// Both decorators embed flob.Store, which does not include PresignOpen, so without
+// capability forwarding the handler's presign lookup would silently fail and
+// server.redirect would be dead. flob.AsPresigner must recover it via Unwrap.
+func TestPresignerSurvivesTraceAndMeterWrapping(t *testing.T) {
+	inner := flob.FixedStores{Store: fakePresignStore{}}
+	traced := StoresTrace{Stores: inner}
+	meter := StoresMeter{base: traced}
+
+	store := meter.Use("x") // == StoreMeter{Store: StoreTrace{fakePresignStore}}
+	if _, ok := flob.AsPresigner(store); !ok {
+		t.Fatal("Presigner capability lost through StoresTrace + StoresMeter; server.redirect would be a no-op")
+	}
+}
+
+func TestServerConfigRedirect(t *testing.T) {
+	var sc ServerConfig
+	if err := yaml.Unmarshal([]byte("redirect: true\n"), &sc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !sc.Redirect {
+		t.Fatal("server.redirect not parsed as true")
 	}
 }
 

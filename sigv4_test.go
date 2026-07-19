@@ -78,6 +78,47 @@ func TestSigV4PutObjectExample(t *testing.T) {
 	}
 }
 
+func TestSigV4PresignGetObjectExample(t *testing.T) {
+	// AWS's published "Query String Request Authentication" example: a presigned
+	// GET of /test.txt on examplebucket, expiring in 86400s, dated 20130524.
+	q := exampleSigner().presignQuery(http.MethodGet, "/test.txt", "examplebucket.s3.amazonaws.com", 86400*time.Second)
+
+	var got string
+	for _, part := range strings.Split(q, "&") {
+		if v, ok := strings.CutPrefix(part, "X-Amz-Signature="); ok {
+			got = v
+		}
+	}
+
+	const want = "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"
+	if got != want {
+		t.Fatalf("presign signature mismatch:\n got=%s\nwant=%s\nquery=%s", got, want, q)
+	}
+	// Sanity: the mandatory query parameters are present and signed-headers is host.
+	for _, must := range []string{
+		"X-Amz-Algorithm=AWS4-HMAC-SHA256",
+		"X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request",
+		"X-Amz-Date=20130524T000000Z",
+		"X-Amz-Expires=86400",
+		"X-Amz-SignedHeaders=host",
+	} {
+		if !strings.Contains(q, must) {
+			t.Errorf("presign query missing %q\nquery=%s", must, q)
+		}
+	}
+}
+
+func TestSigV4PresignClampsExpiry(t *testing.T) {
+	s := exampleSigner()
+	// Over the 7-day maximum is clamped; sub-second is raised to 1s.
+	if q := s.presignQuery(http.MethodGet, "/x", "h", 100*24*time.Hour); !strings.Contains(q, "X-Amz-Expires=604800") {
+		t.Errorf("expiry not clamped to 604800: %s", q)
+	}
+	if q := s.presignQuery(http.MethodGet, "/x", "h", 0); !strings.Contains(q, "X-Amz-Expires=1") {
+		t.Errorf("zero expiry not raised to 1: %s", q)
+	}
+}
+
 func TestSigV4SessionTokenHeaderSigned(t *testing.T) {
 	s := exampleSigner()
 	s.creds.SessionToken = "FQoGZXIvYXdzEXAMPLETOKEN"

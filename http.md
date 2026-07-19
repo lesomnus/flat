@@ -122,6 +122,13 @@ Downloads the blob content. Supports partial downloads via `Range` and
 standard conditional requests via `If-None-Match` / `If-Match`.
 Returns `404 Not Found` if the blob does not exist.
 
+When the server is started with redirect enabled (`server.redirect: true`) and the
+backing store supports presigned URLs (the S3 store), this instead returns
+`307 Temporary Redirect` with a `Location` pointing at a short-lived presigned URL,
+so the client downloads directly from the object store. The redirect response still
+carries the `ETag` and label headers. Stores without presign support stream the
+content as described above. See [`s3.md`](./s3.md) for details.
+
 Success response (`200 OK`):
 
 ```http

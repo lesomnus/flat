@@ -13,6 +13,7 @@ stores:
   #   bucket: my-blobs
   #   prefix: flob                 # optional key prefix within the bucket
   #   path_style: false            # true for MinIO and most S3-compatible servers
+  #   # public_endpoint: https://cdn.example.com  # client-facing URL for presigned redirects
   #   # Credentials and region fall back to AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
   #   # AWS_SESSION_TOKEN / AWS_REGION when omitted, so secrets can stay out of the file.
   #   # access_key_id: ...
@@ -21,6 +22,7 @@ stores:
 server:
   # use: mem
   # addr: 0.0.0.0:8080
+  # redirect: false               # true: GET redirects to a presigned S3 URL (S3 store only)
 
 client:
   # use: http/local

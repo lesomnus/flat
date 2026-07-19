@@ -139,6 +139,8 @@ func (s allowDuplicates) Add(ctx context.Context, m Meta, r io.Reader) (Meta, er
 	return m, err
 }
 
+func (s allowDuplicates) Unwrap() Store { return s.Store }
+
 type checkExistence struct {
 	Store
 }
@@ -155,6 +157,8 @@ func (s checkExistence) Add(ctx context.Context, m Meta, r io.Reader) (Meta, err
 	}
 	return s.Store.Add(ctx, m, r)
 }
+
+func (s checkExistence) Unwrap() Store { return s.Store }
 
 type prepareDigest struct {
 	Store
@@ -183,6 +187,8 @@ func (s prepareDigest) Add(ctx context.Context, m Meta, r io.Reader) (Meta, erro
 	}
 	return s.Store.Add(ctx, m, r)
 }
+
+func (s prepareDigest) Unwrap() Store { return s.Store }
 
 func (s prepareDigest) hash(r io.ReadSeeker) (Digest, error) {
 	c, err := r.Seek(0, io.SeekCurrent)

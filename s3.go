@@ -32,8 +32,9 @@ import (
 )
 
 var (
-	_ Stores = (*S3Stores)(nil)
-	_ Store  = (*S3Store)(nil)
+	_ Stores    = (*S3Stores)(nil)
+	_ Store     = (*S3Store)(nil)
+	_ Presigner = (*S3Store)(nil)
 )
 
 // metaSizeKey is the reserved x-amz-meta suffix that records a blob's size on the
@@ -63,6 +64,11 @@ type S3Config struct {
 	// virtual-hosted style (bucket.host/key). Required for MinIO and most
 	// S3-compatible servers.
 	UsePathStyle bool
+	// PublicEndpoint is the base URL clients use to reach the object store
+	// directly for presigned downloads. It defaults to Endpoint; set it when the
+	// server reaches S3 over an internal endpoint but clients need a different,
+	// publicly reachable one (e.g. a CDN or public hostname).
+	PublicEndpoint string
 	// Client is the HTTP client used for all requests. Defaults to
 	// [http.DefaultClient].
 	Client *http.Client
@@ -77,6 +83,8 @@ type S3Stores struct {
 	signer    signer
 	scheme    string
 	host      string
+	pubScheme string // scheme for presigned (client-facing) URLs
+	pubHost   string // host for presigned (client-facing) URLs
 	bucket    string
 	prefix    string
 	pathStyle bool
@@ -94,19 +102,20 @@ func NewS3Stores(cfg S3Config) (*S3Stores, error) {
 	scheme := "https"
 	host := "s3." + cfg.Region + ".amazonaws.com"
 	if cfg.Endpoint != "" {
-		u, err := url.Parse(cfg.Endpoint)
+		u, err := parseEndpoint(cfg.Endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("s3: parse endpoint: %w", err)
 		}
-		if u.Host == "" {
-			// Endpoint given without a scheme, e.g. "localhost:9000".
-			u, err = url.Parse("https://" + cfg.Endpoint)
-			if err != nil {
-				return nil, fmt.Errorf("s3: parse endpoint: %w", err)
-			}
+		scheme, host = u.Scheme, u.Host
+	}
+
+	pubScheme, pubHost := scheme, host
+	if cfg.PublicEndpoint != "" {
+		u, err := parseEndpoint(cfg.PublicEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("s3: parse public endpoint: %w", err)
 		}
-		scheme = u.Scheme
-		host = u.Host
+		pubScheme, pubHost = u.Scheme, u.Host
 	}
 
 	cl := cfg.Client
@@ -127,10 +136,23 @@ func NewS3Stores(cfg S3Config) (*S3Stores, error) {
 		signer:    signer{creds: cfg.Credentials, region: cfg.Region, service: "s3", now: now},
 		scheme:    scheme,
 		host:      host,
+		pubScheme: pubScheme,
+		pubHost:   pubHost,
 		bucket:    cfg.Bucket,
 		prefix:    prefix,
 		pathStyle: cfg.UsePathStyle,
 	}, nil
+}
+
+// parseEndpoint parses an S3 endpoint URL, tolerating a bare "host:port" without
+// a scheme by assuming https. This covers both "localhost:9000" (which url.Parse
+// accepts with an empty Host) and "10.0.0.5:9000" (which url.Parse rejects because
+// a numeric IP is not a valid scheme), so any scheme-less host:port works.
+func parseEndpoint(s string) (*url.URL, error) {
+	if u, err := url.Parse(s); err == nil && u.Host != "" {
+		return u, nil
+	}
+	return url.Parse("https://" + s)
 }
 
 func (s *S3Stores) Use(id string) Store {
@@ -143,6 +165,22 @@ func (s *S3Stores) blobKey(d Digest) string {
 
 func (s *S3Stores) refKey(d Digest, id string) string {
 	return s.prefix + "refs/" + d.Algorithm().String() + "/" + d.Encoded() + "/" + id
+}
+
+// presignGet builds a presigned GET URL for an in-bucket key, valid for ttl. It
+// uses the public endpoint so the URL is reachable directly by clients, and it
+// signs the exact host+path the client will request.
+func (s *S3Stores) presignGet(key string, ttl time.Duration) string {
+	scheme, host := s.pubScheme, s.pubHost
+	rawPath := "/" + key
+	if s.pathStyle {
+		rawPath = "/" + s.bucket + "/" + key
+	} else {
+		host = s.bucket + "." + host
+	}
+	canonicalURI := awsURIEncode(rawPath, false)
+	query := s.signer.presignQuery(http.MethodGet, canonicalURI, host, ttl)
+	return scheme + "://" + host + canonicalURI + "?" + query
 }
 
 // newRequest builds an unsigned request for an in-bucket key ("" addresses the
@@ -401,6 +439,29 @@ func (s *S3Store) Open(ctx context.Context, d Digest) (io.ReadSeekCloser, Meta, 
 		return nil, Meta{}, fmt.Errorf("read blob: %w", err)
 	}
 	return nopCloser{bytes.NewReader(data)}, Meta{Digest: d, Size: size, Labels: labels}, nil
+}
+
+// PresignOpen implements [Presigner]: it returns a short-lived direct download
+// URL for the shared blob, gated on this store's reference marker so visibility
+// isolation is preserved exactly as in [S3Store.Open].
+func (s *S3Store) PresignOpen(ctx context.Context, d Digest, ttl time.Duration) (string, Meta, error) {
+	d, err := d.Sanitize()
+	if err != nil {
+		return "", Meta{}, ErrNotExist
+	}
+
+	// The presigned URL points at the shared blob/ object, so this HEAD of the
+	// per-store marker is what stops a store from handing out a URL for content
+	// it never added.
+	hres, err := s.stores.head(ctx, s.stores.refKey(d, s.id))
+	if err != nil {
+		return "", Meta{}, err
+	}
+	labels, size := metaToLabels(hres.Header)
+	hres.Body.Close()
+
+	loc := s.stores.presignGet(s.stores.blobKey(d), ttl)
+	return loc, Meta{Digest: d, Size: size, Labels: labels}, nil
 }
 
 func (s *S3Store) Label(ctx context.Context, d Digest, labels Labels) error {

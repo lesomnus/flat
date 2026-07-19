@@ -151,6 +151,12 @@ func (t StoreTrace) Open(ctx context.Context, d flob.Digest) (io.ReadSeekCloser,
 	return t.Store.Open(ctx, d)
 }
 
+// Unwrap exposes the wrapped store so optional capabilities (e.g. flob.Presigner)
+// stay discoverable through this decorator; see flob.AsPresigner.
+func (t StoreTrace) Unwrap() flob.Store {
+	return t.Store
+}
+
 var (
 	_ flob.Stores = StoresMeter{}
 	_ flob.Store  = StoreMeter{}
@@ -255,6 +261,12 @@ func (s StoreMeter) Open(ctx context.Context, d flob.Digest) (r io.ReadSeekClose
 	defer done()
 
 	return s.Store.Open(ctx, d)
+}
+
+// Unwrap exposes the wrapped store so optional capabilities (e.g. flob.Presigner)
+// stay discoverable through this decorator; see flob.AsPresigner.
+func (s StoreMeter) Unwrap() flob.Store {
+	return s.Store
 }
 
 func (s StoreMeter) measure(ctx context.Context, op string, errp *error) func() {

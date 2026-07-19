@@ -75,11 +75,12 @@ func (c StoresConfig) build(ctx context.Context, k string) (s flob.Stores, err e
 
 	case *StoresConfigS3:
 		stores, err := flob.NewS3Stores(flob.S3Config{
-			Endpoint:     c_.Endpoint,
-			Region:       orEnv(c_.Region, "AWS_REGION"),
-			Bucket:       c_.Bucket,
-			Prefix:       c_.Prefix,
-			UsePathStyle: c_.PathStyle,
+			Endpoint:       c_.Endpoint,
+			Region:         orEnv(c_.Region, "AWS_REGION"),
+			Bucket:         c_.Bucket,
+			Prefix:         c_.Prefix,
+			UsePathStyle:   c_.PathStyle,
+			PublicEndpoint: c_.PublicEndpoint,
 			Credentials: flob.Credentials{
 				AccessKeyID:     orEnv(c_.AccessKeyID, "AWS_ACCESS_KEY_ID"),
 				SecretAccessKey: orEnv(c_.SecretAccessKey, "AWS_SECRET_ACCESS_KEY"),
@@ -178,6 +179,9 @@ type StoresConfigS3 struct {
 	// PathStyle selects host/bucket/key addressing; required for MinIO and most
 	// S3-compatible servers.
 	PathStyle bool `yaml:"path_style,omitempty"`
+	// PublicEndpoint is the client-facing S3 URL used for presigned download
+	// redirects; defaults to Endpoint.
+	PublicEndpoint string `yaml:"public_endpoint,omitempty"`
 	// AccessKeyID falls back to $AWS_ACCESS_KEY_ID.
 	AccessKeyID string `yaml:"access_key_id,omitempty"`
 	// SecretAccessKey falls back to $AWS_SECRET_ACCESS_KEY.

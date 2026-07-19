@@ -25,7 +25,19 @@ import (
 // of GET and HEAD requests without the prefix.
 type HttpHandler struct {
 	Stores Stores
+
+	// Redirect, when true, serves GET by redirecting to a backend-provided
+	// presigned URL when the selected store implements [Presigner]; stores that
+	// do not (or a transient presign failure) fall back to streaming the blob.
+	Redirect bool
+	// RedirectTTL bounds the validity of presigned redirect URLs. When zero,
+	// [DefaultRedirectTTL] is used.
+	RedirectTTL time.Duration
 }
+
+// DefaultRedirectTTL is the presigned-URL lifetime used when
+// [HttpHandler.RedirectTTL] is unset.
+const DefaultRedirectTTL = 15 * time.Minute
 
 func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id, digest_raw, ok := h.parsePath(r.URL.Path)
@@ -89,6 +101,31 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 	case http.MethodGet:
+		if h.Redirect {
+			if p, ok := AsPresigner(store); ok {
+				ttl := h.RedirectTTL
+				if ttl <= 0 {
+					ttl = DefaultRedirectTTL
+				}
+				loc, m, err := p.PresignOpen(ctx, d, ttl)
+				switch {
+				case err == nil:
+					h.setMetaHeaders(w, m)
+					// The 307 body is a tiny placeholder, not the blob, so the
+					// blob size must not be advertised as this response's length.
+					w.Header().Del("Content-Length")
+					w.Header().Set("Cache-Control", "no-store")
+					http.Redirect(w, r, loc, http.StatusTemporaryRedirect)
+					return
+				case errors.Is(err, ErrNotExist):
+					http.Error(w, err.Error(), http.StatusNotFound)
+					return
+				default:
+					// Transient presign failure: fall back to streaming below.
+				}
+			}
+		}
+
 		rc, m, err := store.Open(r.Context(), d)
 		if err != nil {
 			switch {

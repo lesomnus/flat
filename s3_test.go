@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/lesomnus/flob/internal/x"
 )
@@ -393,4 +394,191 @@ func TestS3Store(t *testing.T) {
 			t.Fatalf("opaque=%q", req.URL.Opaque)
 		}
 	})
+
+	t.Run("presign is gated per store", func(t *testing.T) {
+		ctx, x := x.New(t)
+		stores, _ := newMockS3Stores(t)
+
+		added, err := stores.Use("a").Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		// b never added the content: no presigned URL is issued.
+		_, _, err = stores.Use("b").(Presigner).PresignOpen(ctx, added.Digest, time.Minute)
+		x.ErrorIs(err, ErrNotExist)
+
+		// a gets a signed URL that points at the shared blob object.
+		loc, m, err := stores.Use("a").(Presigner).PresignOpen(ctx, added.Digest, time.Minute)
+		x.NoError(err)
+		x.Eq(added.Digest, m.Digest)
+		if !strings.Contains(loc, "X-Amz-Signature=") || !strings.Contains(loc, "/blob/") {
+			t.Fatalf("unexpected presigned url: %q", loc)
+		}
+	})
+
+	t.Run("presign uses the public endpoint", func(t *testing.T) {
+		ctx, x := x.New(t)
+		mock := newMockS3("flob-test")
+		srv := httptest.NewServer(mock)
+		t.Cleanup(srv.Close)
+
+		stores, err := NewS3Stores(S3Config{
+			Endpoint:       srv.URL,
+			PublicEndpoint: "https://cdn.example.com",
+			Bucket:         "flob-test",
+			Credentials:    Credentials{AccessKeyID: "k", SecretAccessKey: "s"},
+			UsePathStyle:   true,
+			Client:         srv.Client(),
+		})
+		x.NoError(err)
+
+		added, err := stores.Use("t").Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		loc, _, err := stores.Use("t").(Presigner).PresignOpen(ctx, added.Digest, time.Minute)
+		x.NoError(err)
+		if !strings.HasPrefix(loc, "https://cdn.example.com/flob-test/blob/") {
+			t.Fatalf("presign did not use public endpoint: %q", loc)
+		}
+	})
+
+	t.Run("http handler redirects GET to a presigned url", func(t *testing.T) {
+		ctx, x := x.New(t)
+		stores, _ := newMockS3Stores(t)
+
+		added, err := stores.Use("t").Add(ctx, Meta{Labels: Labels{"Media-Type": {"text/plain"}}}, x.Reader())
+		x.NoError(err)
+
+		fe := httptest.NewServer(HttpHandler{Stores: stores, Redirect: true})
+		t.Cleanup(fe.Close)
+		blobURL := fe.URL + "/t/" + string(added.Digest)
+
+		// Inspect the redirect itself without following it.
+		noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
+		resp, err := noFollow.Get(blobURL)
+		x.NoError(err)
+		resp.Body.Close()
+		x.Eq(http.StatusTemporaryRedirect, resp.StatusCode)
+		x.Eq(`"`+string(added.Digest)+`"`, resp.Header.Get("ETag"))
+		x.Eq("text/plain", resp.Header.Get("Media-Type"))
+		x.Eq("no-store", resp.Header.Get("Cache-Control"))
+		loc := resp.Header.Get("Location")
+		if !strings.Contains(loc, "X-Amz-Signature=") || !strings.Contains(loc, "/blob/") {
+			t.Fatalf("bad Location: %q", loc)
+		}
+
+		// Following it downloads the blob directly from (mock) S3.
+		resp2, err := http.Get(blobURL)
+		x.NoError(err)
+		defer resp2.Body.Close()
+		x.Eq(http.StatusOK, resp2.StatusCode)
+		got, err := io.ReadAll(resp2.Body)
+		x.NoError(err)
+		x.Eq(x.Data(), got)
+	})
+
+	t.Run("redirect falls back to streaming for a non-presigner backend", func(t *testing.T) {
+		ctx, x := x.New(t)
+		mem := NewMemStores()
+		m, err := mem.Use("t").Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		fe := httptest.NewServer(HttpHandler{Stores: mem, Redirect: true})
+		t.Cleanup(fe.Close)
+
+		resp, err := http.Get(fe.URL + "/t/" + string(m.Digest))
+		x.NoError(err)
+		defer resp.Body.Close()
+		x.Eq(http.StatusOK, resp.StatusCode)
+		got, err := io.ReadAll(resp.Body)
+		x.NoError(err)
+		x.Eq(x.Data(), got)
+	})
+
+	t.Run("AsPresigner sees through Unwrap decorators", func(t *testing.T) {
+		stores, _ := newMockS3Stores(t)
+		raw := stores.Use("t") // *S3Store implements Presigner
+
+		if _, ok := AsPresigner(raw); !ok {
+			t.Fatal("raw S3 store should be a Presigner")
+		}
+		// A decorator that embeds Store (so PresignOpen is not promoted) but
+		// forwards Unwrap keeps the capability discoverable, even nested.
+		if _, ok := AsPresigner(unwrapStore{raw}); !ok {
+			t.Fatal("AsPresigner should see through an Unwrap decorator")
+		}
+		if _, ok := AsPresigner(unwrapStore{unwrapStore{raw}}); !ok {
+			t.Fatal("AsPresigner should walk nested Unwrap decorators")
+		}
+		// A decorator that hides PresignOpen and does not implement Unwrap stops
+		// the walk — the capability is genuinely gone.
+		if _, ok := AsPresigner(hiddenStore{raw}); ok {
+			t.Fatal("AsPresigner must not find a Presigner hidden without Unwrap")
+		}
+	})
+
+	t.Run("redirect works when the store is behind a capability-hiding decorator", func(t *testing.T) {
+		ctx, x := x.New(t)
+		stores, _ := newMockS3Stores(t)
+		added, err := stores.Use("t").Add(ctx, Meta{}, x.Reader())
+		x.NoError(err)
+
+		// Model the production wrapping: every Store handed to the handler is
+		// wrapped in a decorator that embeds Store (hiding PresignOpen) but
+		// forwards Unwrap.
+		wrapped := wrapStores{inner: stores, wrap: func(s Store) Store { return unwrapStore{s} }}
+		fe := httptest.NewServer(HttpHandler{Stores: wrapped, Redirect: true})
+		t.Cleanup(fe.Close)
+
+		noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
+		resp, err := noFollow.Get(fe.URL + "/t/" + string(added.Digest))
+		x.NoError(err)
+		resp.Body.Close()
+		x.Eq(http.StatusTemporaryRedirect, resp.StatusCode)
+	})
+
+	t.Run("parseEndpoint tolerates scheme-less host:port and ip:port", func(t *testing.T) {
+		cases := []struct{ endpoint, scheme, host string }{
+			{"localhost:9000", "https", "localhost:9000"},
+			{"10.0.0.5:9000", "https", "10.0.0.5:9000"},
+			{"192.168.1.10:9000", "https", "192.168.1.10:9000"},
+			{"http://minio:9000", "http", "minio:9000"},
+			{"https://s3.example.com", "https", "s3.example.com"},
+		}
+		for _, c := range cases {
+			s, err := NewS3Stores(S3Config{
+				Endpoint:    c.endpoint,
+				Bucket:      "b",
+				Credentials: Credentials{AccessKeyID: "k", SecretAccessKey: "s"},
+			})
+			if err != nil {
+				t.Fatalf("endpoint %q: %v", c.endpoint, err)
+			}
+			if s.scheme != c.scheme || s.host != c.host {
+				t.Errorf("endpoint %q -> scheme=%q host=%q, want %q/%q", c.endpoint, s.scheme, s.host, c.scheme, c.host)
+			}
+		}
+	})
 }
+
+// wrapStores wraps every Store from inner with wrap, modeling the trace/metrics
+// decorators the CLI applies.
+type wrapStores struct {
+	inner Stores
+	wrap  func(Store) Store
+}
+
+func (w wrapStores) Use(id string) Store { return w.wrap(w.inner.Use(id)) }
+
+// unwrapStore embeds Store (so it does NOT promote PresignOpen) but exposes the
+// wrapped store via Unwrap — the pattern the real decorators use.
+type unwrapStore struct{ Store }
+
+func (u unwrapStore) Unwrap() Store { return u.Store }
+
+// hiddenStore embeds Store and does NOT implement Unwrap, so it opaquely hides any
+// optional capability of the store beneath it.
+type hiddenStore struct{ Store }

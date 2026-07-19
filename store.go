@@ -3,6 +3,7 @@ package flob
 import (
 	"context"
 	"io"
+	"time"
 )
 
 type Stores interface {
@@ -31,6 +32,48 @@ type Store interface {
 	// Erase removes the blob with the given digest from the store.
 	// It does not return [ErrNotExist] even if the blob does not exist.
 	Erase(ctx context.Context, d Digest) error
+}
+
+// Presigner is an optional capability a [Store] may implement. Instead of
+// streaming a blob's bytes, it hands out a short-lived direct URL to download it
+// (e.g. an S3 presigned URL), letting a server redirect clients straight to the
+// backing object store. A [Store] that does not implement Presigner is served by
+// streaming through [Store.Open] as usual.
+type Presigner interface {
+	// PresignOpen returns a direct download URL for the blob with the given
+	// digest — valid for approximately ttl — together with its [Meta]. It returns
+	// [ErrNotExist] if this store has no such blob. The URL grants bearer access
+	// to the blob for its lifetime, so ttl should be kept short. Like [Store.Open],
+	// visibility is scoped to the store: a blob added only to another store yields
+	// [ErrNotExist].
+	PresignOpen(ctx context.Context, d Digest, ttl time.Duration) (url string, m Meta, err error)
+}
+
+// storeUnwrapper is implemented by a [Store] decorator to expose the store it
+// wraps, so optional capabilities such as [Presigner] can be discovered through a
+// chain of decorators. It mirrors the errors.Unwrap convention. A decorator that
+// only observes or augments the [Store] methods (tracing, metrics, ...) should
+// implement it so it does not hide capabilities of the store beneath it.
+type storeUnwrapper interface {
+	Unwrap() Store
+}
+
+// AsPresigner returns the first [Presigner] in s's decorator chain, following any
+// Unwrap() Store methods (see [storeUnwrapper]), or false if none is found. Use
+// this instead of a bare type assertion so a store wrapped in tracing/metrics
+// decorators still exposes presign support.
+func AsPresigner(s Store) (Presigner, bool) {
+	for s != nil {
+		if p, ok := s.(Presigner); ok {
+			return p, true
+		}
+		u, ok := s.(storeUnwrapper)
+		if !ok {
+			return nil, false
+		}
+		s = u.Unwrap()
+	}
+	return nil, false
 }
 
 type Meta struct {
