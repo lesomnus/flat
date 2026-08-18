@@ -9,7 +9,7 @@ COPY . .
 ENV CGO_ENABLED=0
 RUN mkdir /dist \
 	&& cd /app/cmd/flob \
-	&& go work init && go work use -r ../ \
+	&& go work init && go work use -r ../../ \
 	&& GOARCH=amd64 go build -o /dist/amd64 . \
 	&& GOARCH=arm64 go build -o /dist/arm64 .
 
