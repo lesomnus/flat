@@ -74,6 +74,10 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusNotFound)
 			case errors.Is(err, ErrAlreadyExists):
 				h.setMetaHeaders(w, m)
+				// This response carries no body, so the blob size set by
+				// setMetaHeaders must not be advertised as its length or strict
+				// clients (and reverse proxies) wait for bytes that never come.
+				w.Header().Del("Content-Length")
 				w.WriteHeader(http.StatusOK)
 			case errors.Is(err, ErrDigestMismatch):
 				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
@@ -84,6 +88,10 @@ func (h HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		h.setMetaHeaders(w, m)
 		w.Header().Set("Location", "/"+id+"/"+string(m.Digest))
+		// This response carries no body, so the blob size set by setMetaHeaders
+		// must not be advertised as its length or strict clients (and reverse
+		// proxies) wait for bytes that never come.
+		w.Header().Del("Content-Length")
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodHead:

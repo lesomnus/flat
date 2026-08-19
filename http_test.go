@@ -2,6 +2,7 @@ package flob
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -88,5 +89,44 @@ func TestHttpStore(t *testing.T) {
 
 		_, err := stores.Use("t").Add(ctx, Meta{}, x.Reader())
 		x.ErrorIs(err, ErrNotExist)
+	})
+	t.Run("post response advertises no phantom body length", func(t *testing.T) {
+		// Regression: Add set Content-Length to the stored blob size on the
+		// bodyless 201/200 response, so strict clients and reverse proxies wait
+		// for bytes that never arrive (io.ReadAll -> unexpected EOF).
+		_, x := x.New(t)
+		_, srv := newHttpStores(t, NewMemStores())
+
+		data := []byte("hello flob")
+		post := func() *http.Response {
+			t.Helper()
+			req, err := http.NewRequest(http.MethodPost, srv.URL+"/t", bytes.NewReader(data))
+			x.NoError(err)
+			resp, err := srv.Client().Do(req)
+			x.NoError(err)
+			return resp
+		}
+
+		// First POST stores the blob (201 Created).
+		resp := post()
+		x.Eq(http.StatusCreated, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		x.NoError(err)
+		x.Eq(0, len(body))
+		if resp.ContentLength > 0 {
+			t.Fatalf("201 advertised Content-Length %d but sends no body", resp.ContentLength)
+		}
+
+		// Second POST hits the already-exists path (200 OK), also bodyless.
+		resp = post()
+		x.Eq(http.StatusOK, resp.StatusCode)
+		body, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		x.NoError(err)
+		x.Eq(0, len(body))
+		if resp.ContentLength > 0 {
+			t.Fatalf("200 advertised Content-Length %d but sends no body", resp.ContentLength)
+		}
 	})
 }
