@@ -65,9 +65,11 @@ $ echo "Royale with Cheese" | flob add foo -
 $ flob add --parallel 4 foo ./blobs/*.bin
 ```
 
-It will print the digest of each added blob, one per line, **in the order the
-files were given** — so a caller can pair them with its own list positionally
-even when they finish out of order.
+It will print the digest of each blob the store now holds, one per line, **in
+the order the files were given** — so a caller can pair them with its own list
+positionally even when they finish out of order. A file that failed prints
+nothing: the digest was computed on the way to failing, and printing it would
+claim the store has bytes it does not.
 ```
 4833c026fdec5fe24871c2245b6ea0c392c01057f6c6f4637bcabf8b80e35753
 ```

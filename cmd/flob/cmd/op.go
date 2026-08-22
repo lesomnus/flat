@@ -84,10 +84,19 @@ func NewCmdAdd() *xli.Command {
 
 			// In the order they were given, whatever order they finished in: a
 			// caller pairing digests with file names reads them positionally.
+			//
+			// A file that failed prints nothing, even though the digest was
+			// computed on the way to failing — printing it would say the store
+			// has bytes it does not. That breaks the positional pairing, which
+			// is the honest outcome: the command is about to exit non-zero.
 			for _, r := range rs {
-				if r.digest != "" {
-					cmd.Println(r.digest)
+				if r.digest == "" {
+					continue
 				}
+				if r.err != nil && !errors.Is(r.err, flob.ErrAlreadyExists) {
+					continue
+				}
+				cmd.Println(r.digest)
 			}
 
 			existed := 0
