@@ -12,6 +12,6 @@ func main() {
 	c := cmd.NewCmdRoot()
 	if err := c.Run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Println("app exited with error:", err)
-		os.Exit(1)
+		os.Exit(cmd.ExitCode(err))
 	}
 }
