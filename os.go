@@ -82,9 +82,21 @@ func (s OsStore) Add(ctx context.Context, m Meta, r io.Reader) (Meta, error) {
 		// Blob with the given digest does not exist, so proceed to add it.
 	}
 
-	// Write to a local temp file first, not to the store root since the store root
-	// may be on a different device and we need to compute the digest while writing.
-	tf, err := os.CreateTemp("", "flob-*")
+	// Write to a temp file first: the digest has to be computed while writing,
+	// and what is written cannot be given its name until it is known.
+	//
+	// Inside the store, not `os.TempDir()`. A scratch container has no /tmp at
+	// all -- a robot pulling blobs into an `os` store failed on its first Add
+	// with "create temp: no such file or directory", and nothing about that
+	// says which directory it meant. Staging here also puts the file on the
+	// same filesystem as the copy that follows it, which the store root being
+	// on another device is a reason for rather than against.
+	pt, err := s.ensureStagePath()
+	if err != nil {
+		return m, fmt.Errorf("ensure stage path: %w", err)
+	}
+
+	tf, err := os.CreateTemp(pt, "flob-*")
 	if err != nil {
 		return m, fmt.Errorf("create temp: %w", err)
 	}

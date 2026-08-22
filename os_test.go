@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -285,4 +286,31 @@ func TestOsStore(t *testing.T) {
 			t.Fatalf("final Add failed: %v", err)
 		}
 	})
+}
+
+// TestOsStoreAddWithoutASystemTempDir is the container case: `FROM scratch` has
+// no /tmp, and an Add that staged there failed before it read a byte.
+func TestOsStoreAddWithoutASystemTempDir(t *testing.T) {
+	// TMPDIR at a path that does not exist is what os.TempDir() answers with in
+	// an image that never had one.
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "not-here"))
+
+	root := t.TempDir()
+	s := NewOsStores(root).Use("_")
+
+	data := []byte("bytes a robot asked for")
+	m, err := s.Add(t.Context(), Meta{}, strings.NewReader(string(data)))
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if m.Digest != DigestFromBytes(data) {
+		t.Fatalf("digest: got %s", m.Digest)
+	}
+	if m.Size != int64(len(data)) {
+		t.Fatalf("size: got %d want %d", m.Size, len(data))
+	}
+
+	if _, err := s.Get(t.Context(), m.Digest); err != nil {
+		t.Fatalf("get: %v", err)
+	}
 }
