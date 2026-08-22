@@ -99,27 +99,43 @@ func NewCmdAdd() *xli.Command {
 				cmd.Println(r.digest)
 			}
 
-			existed := 0
-			for _, r := range rs {
-				switch {
-				case r.err != nil && errors.Is(r.err, flob.ErrAlreadyExists):
-					// Not a failure. The store is content-addressed, so a blob
-					// that is already there is the end state this asked for,
-					// which is what makes re-running a publish cheap.
-					existed++
-				case r.err != nil:
-					return z.Err(r.err, "op")
-				}
-			}
-			if existed == len(rs) {
-				// Every input was already there. Reported as such so a single
-				// add still exits with ExitAlreadyExists, and so a batch can
-				// tell "nothing to do" from "something was published".
-				return flob.ErrAlreadyExists
-			}
-			return nil
+			return addOutcome(rs)
 		}),
 	}
+}
+
+// addOutcome reduces one result per file to the single error the process exits
+// with.
+//
+// It reports *every* failure, not the first one: [addAll] deliberately keeps
+// going after a file fails, and stopping here would throw that away — a run
+// that uploads hundreds of blobs would name one bad file per re-run instead of
+// all of them in one pass.
+func addOutcome(rs []addResult) error {
+	existed := 0
+	var errs []error
+	for _, r := range rs {
+		switch {
+		case r.err == nil:
+		case errors.Is(r.err, flob.ErrAlreadyExists):
+			// Not a failure. The store is content-addressed, so a blob that is
+			// already there is the end state this asked for, which is what
+			// makes re-running a publish cheap.
+			existed++
+		default:
+			errs = append(errs, r.err)
+		}
+	}
+	if len(errs) > 0 {
+		return z.Err(errors.Join(errs...), "op")
+	}
+	if len(rs) > 0 && existed == len(rs) {
+		// Every input was already there. Reported as such so a single add
+		// still exits with ExitAlreadyExists, and so a batch can tell
+		// "nothing to do" from "something was published".
+		return flob.ErrAlreadyExists
+	}
+	return nil
 }
 
 type addResult struct {

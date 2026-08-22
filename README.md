@@ -33,20 +33,10 @@ func main() {
 
 ## CLI
 
-`cmd/flob` is a separate module (`github.com/lesomnus/flob/cmd/flob`) wrapping the
-same stores. Its exit codes are part of the contract, because the interesting
-failures are the ones a script should *not* treat as failures:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | success |
-| `1` | any error not classified below |
-| `3` | `ErrAlreadyExists` — the store already holds this blob, nothing was written |
-| `4` | `ErrNotExist` — the store answered and the blob is not there (as opposed to a transport or credential failure, which is `1`) |
-
-So a batch `flob add` loop skips on `3` and still fails on a real upload error,
-and an existence check reads `4` as "absent" without mistaking a broken
-connection for one. `2` is left unused; it is conventionally a usage error.
+`cmd/flob` is a separate module (`github.com/lesomnus/flob/cmd/flob`) wrapping
+the same stores. Its commands, configuration, and **exit codes** — `3` for
+"already there", `4` for "not there", both of which a script wants to tell from
+a real failure — are documented in [`cmd/flob/README.md`](./cmd/flob/README.md).
 
 ## Backends
 

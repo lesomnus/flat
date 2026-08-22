@@ -175,3 +175,57 @@ func (s *countingStore) Add(ctx context.Context, m flob.Meta, r io.Reader) (flob
 	s.mu.Unlock()
 	return m, err
 }
+
+func TestAddOutcome(t *testing.T) {
+	fail := func(name string) addResult {
+		return addResult{err: fmt.Errorf("%s: %w", name, errors.New("connection reset"))}
+	}
+	ok := addResult{digest: "sha256:aa"}
+	dup := addResult{digest: "sha256:bb", err: fmt.Errorf("b: %w", flob.ErrAlreadyExists)}
+
+	t.Run("all added is success", func(t *testing.T) {
+		if err := addOutcome([]addResult{ok, ok}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("all already there is reported as such", func(t *testing.T) {
+		err := addOutcome([]addResult{dup, dup})
+		if !errors.Is(err, flob.ErrAlreadyExists) {
+			t.Fatalf("got %v, want ErrAlreadyExists", err)
+		}
+	})
+
+	t.Run("one added among duplicates is success", func(t *testing.T) {
+		// Publishing a model that shares blobs with a published one lands
+		// here, and it is not a re-run: something was written.
+		if err := addOutcome([]addResult{dup, ok, dup}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("every failure is reported, not just the first", func(t *testing.T) {
+		err := addOutcome([]addResult{fail("a"), ok, fail("c"), dup})
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		for _, name := range []string{"a", "c"} {
+			if !strings.Contains(err.Error(), name+":") {
+				t.Fatalf("%q is missing from: %v", name, err)
+			}
+		}
+	})
+
+	t.Run("a failure outweighs the duplicates", func(t *testing.T) {
+		// Otherwise a run where everything else was already there would exit
+		// 3, and a caller that treats 3 as "nothing to do" would call a failed
+		// publish a successful one.
+		err := addOutcome([]addResult{dup, fail("b"), dup})
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		if errors.Is(err, flob.ErrAlreadyExists) {
+			t.Fatalf("reported as already-exists: %v", err)
+		}
+	})
+}
