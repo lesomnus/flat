@@ -53,7 +53,7 @@ otel:
 ### Add a Blob
 
 ```sh
-flob add <STORE_ID> <FILE>
+flob add [--parallel N] <STORE_ID> <FILE>...
 ```
 
 ```sh
@@ -61,12 +61,36 @@ flob add <STORE_ID> <FILE>
 $ flob add foo ./path/to/file
 # Add a blob into store "foo" from standard input
 $ echo "Royale with Cheese" | flob add foo -
+# Add many, four at a time
+$ flob add --parallel 4 foo ./blobs/*.bin
 ```
 
-It will print the digest of the added blob.
+It will print the digest of each added blob, one per line, **in the order the
+files were given** — so a caller can pair them with its own list positionally
+even when they finish out of order.
 ```
 4833c026fdec5fe24871c2245b6ea0c392c01057f6c6f4637bcabf8b80e35753
 ```
+
+Take the whole set in one invocation rather than one process per file. A store's
+client, its configuration and its credentials are built once per process, and a
+publish that spawns a process per blob pays for all of that thousands of times.
+`--parallel` (default 1) then overlaps the round trips within that one process.
+Standard input forces sequential: it can only be read once.
+
+A file the store already has is **not a failure**. Content is addressed by
+digest, so a blob that is already there is the end state the command asked for,
+which is what makes re-running a publish cheap; its digest is printed like any
+other. The exit code says which happened:
+
+| exit | meaning |
+|------|---------|
+| `0`  | at least one blob was written |
+| `3`  | every file was already in the store — nothing to do |
+| `1`  | something failed |
+
+Every file is attempted even if an earlier one fails, so one run reports
+everything that is wrong rather than one problem per re-run.
 
 ### Get a Blob
 

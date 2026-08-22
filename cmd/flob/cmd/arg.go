@@ -16,6 +16,12 @@ import (
 type FlgReader = flg.Base[ReaderResolver, ReaderParser]
 type ArgReader = arg.Mono[ReaderResolver, ReaderParser]
 
+// ArgReaders is a trailing list of files, so one invocation can take the whole
+// set. A store's client, its config and its credentials are set up once per
+// process, and a publish that spawns one process per blob pays for all of it
+// thousands of times.
+type ArgReaders = arg.Rest[ReaderResolver, arg.MonoParser[ReaderResolver, ReaderParser]]
+
 type ReaderParser string
 
 func (ReaderParser) ToString(v ReaderResolver) string {
