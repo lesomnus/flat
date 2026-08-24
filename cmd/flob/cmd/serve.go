@@ -10,6 +10,7 @@ import (
 	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/otx/otxhttp"
+	"github.com/lesomnus/xddr"
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/z"
 )
@@ -35,8 +36,17 @@ func NewCmdServe() *xli.Command {
 			mux := http.NewServeMux()
 			mux.Handle("/", otxhttp.NewHandler(otx.From(ctx), otxhttp.BoundaryLogger()(h), "/"))
 
-			l.Info("serve", slog.String("addr", ":8080"))
-			if err := http.ListenAndServe(":8080", mux); err != nil {
+			// Listen on the configured address (server.addr, e.g. "tcp4:0.0.0.0:8087";
+			// defaults to "0.0.0.0:8080" — see configs.ServerConfig.Evaluate). Split
+			// into network + address by xddr so a non-default port actually takes
+			// effect instead of the old hardcoded ":8080".
+			l.Info("serve", slog.String("addr", string(c.Server.Addr)))
+			ln, err := xddr.Listen(c.Server.Addr)
+			if err != nil {
+				return z.Err(err, "listen: %s", c.Server.Addr)
+			}
+			defer ln.Close()
+			if err := http.Serve(ln, mux); err != nil {
 				return z.Err(err, "start http server")
 			}
 

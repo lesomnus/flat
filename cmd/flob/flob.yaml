@@ -21,7 +21,8 @@ stores:
 
 server:
   # use: mem
-  # addr: 0.0.0.0:8080
+  # addr: 0.0.0.0:8080            # listen address; network is inferred (tcp), or set it
+  #                               # explicitly, e.g. tcp4:0.0.0.0:8087 / unix:/run/flob.sock
   # redirect: false               # true: GET redirects to a presigned S3 URL (S3 store only)
 
 client:
